@@ -92,10 +92,20 @@ class Login:
         if user == "ADMIN" and password == "1234":
             messagebox.showinfo("Login", "Bienvenido Admin")
             self.root.destroy()
-            # app2 = App()
-            # app2.mainloop()
+            ventana_principal = tk.Tk()
+            app2 = App(ventana_principal)
+            ventana_principal.mainloop()
         else:
             messagebox.showerror("ERROR", "Error en sus credenciales, inténtelo de nuevo.")
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("GEOS - Sistema Principal")
+        self.root.geometry("900x600")
+        self.root.configure(bg="#FFFFFF")
+
+        tk.Label(self.root, text="Bienvenido al Sistema GEOS",font=("Arial", 24, "bold"),bg="#FFFFFF", fg="#0055A5").pack(pady=50)
 
 if __name__ == "__main__":
     root = tk.Tk()
