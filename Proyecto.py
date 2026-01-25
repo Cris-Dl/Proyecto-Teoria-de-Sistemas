@@ -1,3 +1,5 @@
+import sqlite3
+
 class Proveedores:
     def __init__(self, nombre, codigo, telefono, informacion):
         self.__nombre = nombre
@@ -41,3 +43,22 @@ class Proveedores:
             self.__informacion = new_informacion
         else:
             print("El campo no puede estar vacio")
+
+class ProveedooresDB:
+    DB_NAME = "proveedores.db"
+
+    @staticmethod
+    def _conn():
+        conn = sqlite3.connect(ProveedooresDB.DB_NAME)
+        conn.row_factory = sqlite3.Row
+
+        # 1. Tabla de proveedores
+        conn.execute("""
+                    CREATE TABLE IF NOT EXISTS proveedores (
+                        id_num INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nombre TEXT NOT NULL,
+                        telefono TEXT NOT NULL,
+                        tipo_producto TEXT NOT NULL,
+                        informacion REAL
+                    );
+                """)
