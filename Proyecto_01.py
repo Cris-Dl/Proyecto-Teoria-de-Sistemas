@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import messagebox
 import os
 
-
 class Login:
     def __init__(self, root):
         self.root = root
@@ -38,6 +37,7 @@ class Login:
         self.entry_user.insert(0, "Usuario")
         self.entry_user.bind("<FocusIn>", self.clear_placeholder_user)
         self.entry_user.bind("<FocusOut>", self.restore_placeholder_user)
+        self.entry_user.bind("<Return>", lambda event: self.login())
 
         self.frame_pass = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG,highlightbackground=self.COLOR_AZUL,highlightthickness=2)
         self.frame_pass.pack(pady=(0, 40))
@@ -49,6 +49,7 @@ class Login:
         self.entry_password.insert(0, "Contraseña")
         self.entry_password.bind("<FocusIn>", self.clear_placeholder_pass)
         self.entry_password.bind("<FocusOut>", self.restore_placeholder_pass)
+        self.entry_password.bind("<Return>", lambda event: self.login())
         self.password_hidden = False
 
         self.boton_login = tk.Button(self.frame_login, text="INICIAR SESIÓN",bg=self.COLOR_AZUL, fg="white",font=("Arial", 12, "bold"),relief="flat", cursor="hand2",width=32, height=2,command=self.login)
@@ -90,12 +91,11 @@ class Login:
 
         if user == "ADMIN" and password == "1234":
             messagebox.showinfo("Login", "Bienvenido Admin")
-            # self.root.destroy()
+            self.root.destroy()
             # app2 = App()
             # app2.mainloop()
         else:
             messagebox.showerror("ERROR", "Error en sus credenciales, inténtelo de nuevo.")
-
 
 if __name__ == "__main__":
     root = tk.Tk()
