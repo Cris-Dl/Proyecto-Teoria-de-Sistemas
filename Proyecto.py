@@ -44,14 +44,15 @@ class Proveedores:
         else:
             print("El campo no puede estar vacio")
 
-class Produtos:
-    def __init__(self, nombre, codigo, precio_compra, precio_venta, categoria, cantidad):
+class Productos:
+    def __init__(self, nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor):
         self.__nombre = nombre
         self.__codigo = codigo
         self.__precio_compra = precio_compra
         self.__precio_venta = precio_venta
         self.__categoria = categoria
         self.__cantidad = cantidad
+        self.__proveedor = proveedor
 
     @property
     def nombre(self):
@@ -112,6 +113,16 @@ class Produtos:
         else:
             print("El campo no puede estar vacio")
 
+    @property
+    def proveedor(self):
+        return self.__proveedor
+
+    @proveedor.setter
+    def proveedor(self, new_proveedor):
+        if new_proveedor:
+            self.__proveedor = new_proveedor
+        else:
+            print("El campo no puede estar vacio")
 
 class TablasDB:
     DB_NAME = "proveedores.db"
@@ -141,7 +152,8 @@ class TablasDB:
                             precio_compra REAL,
                             precio_venta REAL,
                             categoria TEXT NOT NULL,
-                            cantidad REAL
+                            cantidad REAL,
+                            proveedor TEXT NOT NULL
                         );
                     """)
 
@@ -149,8 +161,8 @@ class TablasDB:
         return conn
 
 
-class GestorProveedores:
-    def guardar_proveedor(self, proveedor):
+class AgregarProveedor:
+    def agregar_proveedor(self, proveedor):
         if not isinstance(proveedor, Proveedores):
             print("Error: El objeto no es un proveedor válido.")
             return False
@@ -174,19 +186,67 @@ class GestorProveedores:
         finally:
             conn.close()
 
+class ModificarProveedor:
+    def modificar_proveedor(self, proveedor):
+        if not isinstance(proveedor, Proveedores):
+            print("Error: El objeto no es un proveedor válido.")
+            return False
+        conn = TablasDB._conn()
+        try:
+            query = """UPDATE proveedores
+                SET nombre = ?, telefono = ?, informacion = ?
+                WHERE codigo = ?
+            """
+            datos = (proveedor.nombre, proveedor.telefono, proveedor.informacion,proveedor.codigo)
+            cursor = conn.execute(query, datos)
+            conn.commit()
+            if cursor.rowcount > 0:
+                print(f"Proveedor con código '{proveedor.codigo}' modificado exitosamente.")
+                return True
+            else:
+                print(f"No se encontró ningún proveedor con el código '{proveedor.codigo}'.")
+                return False
+        except Exception as e:
+            print(f"Error al modificar: {e}")
+            return False
+        finally:
+            conn.close()
 
-class GestorProductos:
-    def guardar_producto(self, producto):
-        if not isinstance(producto, Produtos):
+
+class EliminarProveedor:
+    def eliminar_proveedor(self, codigo_proveedor):
+        conn = TablasDB._conn()
+        try:
+            codigo_a_borrar = codigo_proveedor
+            if isinstance(codigo_proveedor, Proveedores):
+                codigo_a_borrar = codigo_proveedor.codigo
+            query = "DELETE FROM proveedores WHERE codigo = ?"
+            cursor = conn.execute(query, (codigo_a_borrar,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                print(f"ÉXITO: Proveedor con código '{codigo_a_borrar}' eliminado.")
+                return True
+            else:
+                print(f"ADVERTENCIA: No se encontró ningún proveedor con el código '{codigo_a_borrar}'.")
+                return False
+        except Exception as e:
+            print(f"Error al eliminar: {e}")
+            return False
+        finally:
+            conn.close()
+
+class AgregarProducto:
+    def agregar_producto(self, producto):
+        if not isinstance(producto, Productos):
             print("Error: El objeto no es un producto válido.")
             return False
         conn = TablasDB._conn()
         try:
             query = """
-                INSERT INTO productos (nombre, codigo, precio_compra, precio_venta, categoria, cantidad)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO productos (nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """
-            datos = (producto.nombre,producto.codigo,producto.precio_compra,producto.precio_venta,producto.categoria,producto.cantidad)
+            datos = (producto.nombre,producto.codigo,producto.precio_compra,producto.precio_venta,producto.categoria,producto.cantidad, producto.proveedor)
             conn.execute(query, datos)
             conn.commit()
             print(f"Producto '{producto.nombre}' guardado exitosamente.")
@@ -196,6 +256,60 @@ class GestorProductos:
             return False
         except Exception as e:
             print(f"Ocurrió un error al guardar el producto: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+class ModificarProducto:
+    def modificar_producto(self, producto):
+        if not isinstance(producto, Productos):
+            print("Error: El objeto no es un producto válido.")
+            return False
+        dato_proveedor = producto.proveedor
+        if isinstance(dato_proveedor, Proveedores):
+            dato_proveedor = dato_proveedor.nombre
+        conn = TablasDB._conn()
+        try:
+            query = """
+                UPDATE productos
+                SET nombre = ?, precio_compra = ?, precio_venta = ?, categoria = ?, cantidad = ?, proveedor = ?
+                WHERE codigo = ?
+            """
+            datos = (producto.nombre, producto.precio_compra, producto.precio_venta, producto.categoria, producto.cantidad, dato_proveedor, producto.codigo)
+            cursor = conn.execute(query, datos)
+            conn.commit()
+            if cursor.rowcount > 0:
+                print(f"Producto con código '{producto.codigo}' modificado exitosamente.")
+                return True
+            else:
+                print(f"No se encontró ningún producto con el código '{producto.codigo}'.")
+                return False
+        except Exception as e:
+            print(f"Error al modificar producto: {e}")
+            return False
+        finally:
+            conn.close()
+
+
+class EliminarProducto:
+    def eliminar_producto(self, codigo_producto):
+        conn = TablasDB._conn()
+        try:
+            codigo_a_borrar = codigo_producto
+            if isinstance(codigo_producto, Productos):
+                codigo_a_borrar = codigo_producto.codigo
+            query = "DELETE FROM productos WHERE codigo = ?"
+            cursor = conn.execute(query, (codigo_a_borrar,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                print(f"ÉXITO: Producto con código '{codigo_a_borrar}' eliminado.")
+                return True
+            else:
+                print(f"ADVERTENCIA: No se encontró producto con código '{codigo_a_borrar}'.")
+                return False
+        except Exception as e:
+            print(f"Error al eliminar producto: {e}")
             return False
         finally:
             conn.close()
