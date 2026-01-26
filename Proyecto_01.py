@@ -2,6 +2,113 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from datetime import datetime
 import os
+import sqlite3
+
+
+class TablasDB:
+    DB_NAME = "geos_inventario.db"
+
+    @staticmethod
+    def _conn():
+        conn = sqlite3.connect(TablasDB.DB_NAME)
+        conn.row_factory = sqlite3.Row
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS inventario (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo TEXT UNIQUE NOT NULL,
+                nombre TEXT NOT NULL,
+                cantidad INTEGER NOT NULL,
+                precio REAL NOT NULL,
+                fecha TEXT NOT NULL
+            );
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS proveedores (
+                id_num INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                codigo TEXT UNIQUE NOT NULL,
+                telefono TEXT NOT NULL,
+                informacion TEXT
+            );
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS productos (
+                id_num INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                codigo TEXT UNIQUE NOT NULL,
+                precio_compra REAL,
+                precio_venta REAL,
+                categoria TEXT NOT NULL,
+                cantidad REAL,
+                proveedor TEXT NOT NULL
+            );
+        """)
+
+        conn.commit()
+        return conn
+
+
+class InventarioDB:
+    @staticmethod
+    def obtener_todos():
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("SELECT * FROM inventario ORDER BY codigo")
+            items = []
+            for row in cursor:
+                items.append({
+                    "id": row["codigo"],
+                    "nombre": row["nombre"],
+                    "cantidad": row["cantidad"],
+                    "precio": row["precio"],
+                    "fecha": row["fecha"]
+                })
+            return items
+        finally:
+            conn.close()
+
+    @staticmethod
+    def agregar(codigo, nombre, cantidad, precio):
+        conn = TablasDB._conn()
+        try:
+            fecha = datetime.now().strftime("%Y-%m-%d")
+            conn.execute(
+                "INSERT INTO inventario (codigo, nombre, cantidad, precio, fecha) VALUES (?, ?, ?, ?, ?)",
+                (codigo, nombre, cantidad, precio, fecha)
+            )
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def actualizar(codigo, nombre, cantidad, precio):
+        conn = TablasDB._conn()
+        try:
+            fecha = datetime.now().strftime("%Y-%m-%d")
+            cursor = conn.execute(
+                "UPDATE inventario SET nombre = ?, cantidad = ?, precio = ?, fecha = ? WHERE codigo = ?",
+                (nombre, cantidad, precio, fecha, codigo)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    @staticmethod
+    def eliminar(codigo):
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("DELETE FROM inventario WHERE codigo = ?", (codigo,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
 
 
 class Login:
@@ -21,31 +128,36 @@ class Login:
 
         ruta_script = os.path.dirname(os.path.abspath(__file__))
         ruta_logo = os.path.join(ruta_script, "logo_geos.png")
-        self.imagen = tk.PhotoImage(file=ruta_logo)
-        self.label_logo = tk.Label(self.root, image=self.imagen, bg=self.COLOR_FONDO)
-        self.label_logo.pack(pady=(60, 80))
+
+        try:
+            self.imagen = tk.PhotoImage(file=ruta_logo)
+            self.label_logo = tk.Label(self.root, image=self.imagen, bg=self.COLOR_FONDO)
+            self.label_logo.pack(pady=(60, 80))
+        except:
+            tk.Label(self.root, text="GEOS", font=("Arial", 48, "bold"),bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(60, 20))
+            tk.Label(self.root, text="Herramientas y Equipos", font=("Arial", 14),bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(0, 60))
 
         self.frame_login = tk.Frame(self.root, bg=self.COLOR_FONDO)
         self.frame_login.pack()
 
-        self.frame_user = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG,highlightbackground=self.COLOR_AZUL,highlightthickness=2)
+        self.frame_user = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG, highlightbackground=self.COLOR_AZUL,highlightthickness=2)
         self.frame_user.pack(pady=(0, 20))
 
-        tk.Label(self.frame_user, text="👤", font=("Arial", 14),bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(side="left", padx=(15, 5))
+        tk.Label(self.frame_user, text="👤", font=("Arial", 14), bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(side="left", padx=(15, 5))
 
-        self.entry_user = tk.Entry(self.frame_user, font=("Arial", 12),bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,relief="flat", width=28)
+        self.entry_user = tk.Entry(self.frame_user, font=("Arial", 12), bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,relief="flat", width=28)
         self.entry_user.pack(side="left", padx=(5, 15), pady=15)
         self.entry_user.insert(0, "Usuario")
         self.entry_user.bind("<FocusIn>", self.clear_placeholder_user)
         self.entry_user.bind("<FocusOut>", self.restore_placeholder_user)
         self.entry_user.bind("<Return>", lambda event: self.login())
 
-        self.frame_pass = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG,highlightbackground=self.COLOR_AZUL,highlightthickness=2)
+        self.frame_pass = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG, highlightbackground=self.COLOR_AZUL,highlightthickness=2)
         self.frame_pass.pack(pady=(0, 40))
 
-        tk.Label(self.frame_pass, text="🔒", font=("Arial", 14),bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(side="left", padx=(15, 5))
+        tk.Label(self.frame_pass, text="🔒", font=("Arial", 14), bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(side="left", padx=(15, 5))
 
-        self.entry_password = tk.Entry(self.frame_pass, font=("Arial", 12),bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,relief="flat", width=28)
+        self.entry_password = tk.Entry(self.frame_pass, font=("Arial", 12), bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,relief="flat", width=28)
         self.entry_password.pack(side="left", padx=(5, 15), pady=15)
         self.entry_password.insert(0, "Contraseña")
         self.entry_password.bind("<FocusIn>", self.clear_placeholder_pass)
@@ -53,7 +165,7 @@ class Login:
         self.entry_password.bind("<Return>", lambda event: self.login())
         self.password_hidden = False
 
-        self.boton_login = tk.Button(self.frame_login, text="INICIAR SESIÓN",bg=self.COLOR_AZUL, fg="white",font=("Arial", 12, "bold"),relief="flat", cursor="hand2",width=32, height=2,command=self.login)
+        self.boton_login = tk.Button(self.frame_login, text="INICIAR SESIÓN", bg=self.COLOR_AZUL, fg="white",font=("Arial", 12, "bold"), relief="flat", cursor="hand2", width=32, height=2,command=self.login)
         self.boton_login.pack()
 
     def centrar_ventana(self, ancho, alto):
@@ -114,24 +226,11 @@ class SistemaGEOS:
 
         self.pestana_actual = "Inventario"
 
-        self.inventario = [
-            {"id": "GEOS-001", "nombre": "Taladro Percutor XP150", "cantidad": 45, "precio": 84.50,
-             "fecha": "2026-01-24"},
-            {"id": "GEOS-002", "nombre": "Sierra Circular CS300", "cantidad": 28, "precio": 120.00,
-             "fecha": "2026-01-23"},
-            {"id": "GEOS-003", "nombre": "Llave de Impacto IW200", "cantidad": 60, "precio": 49.99,
-             "fecha": "2026-01-24"},
-            {"id": "GEOS-004", "nombre": "Llave de Impacto Pasill 5", "cantidad": 60, "precio": 49.99,
-             "fecha": "2026-01-24"},
-            {"id": "GEOS-005", "nombre": "Llave de Juceniería", "cantidad": 60, "precio": 40.00, "fecha": "2026-01-24"},
-            {"id": "GEOS-006", "nombre": "Pieer edex perfena", "cantidad": 60, "precio": 40.50, "fecha": "2026-01-24"},
-        ]
-
         self.crear_interfaz()
         self.cargar_datos()
 
     def confirmar_cierre(self):
-        respuesta = messagebox.askyesno("Confirmar Salida","¿Está seguro que desea cerrar el programa?")
+        respuesta = messagebox.askyesno("Confirmar Salida", "¿Está seguro que desea cerrar el programa?")
         if respuesta:
             self.root.destroy()
 
@@ -142,9 +241,14 @@ class SistemaGEOS:
 
         ruta_script = os.path.dirname(os.path.abspath(__file__))
         ruta_logo = os.path.join(ruta_script, "logo_geos_2.png")
-        self.imagen = tk.PhotoImage(file=ruta_logo)
-        label_logo = tk.Label(frame_superior, image=self.imagen, bg=self.COLOR_FONDO)
-        label_logo.pack(pady=20)
+
+        try:
+            self.imagen = tk.PhotoImage(file=ruta_logo)
+            label_logo = tk.Label(frame_superior, image=self.imagen, bg=self.COLOR_FONDO)
+            label_logo.pack(pady=20)
+        except:
+            tk.Label(frame_superior, text="GEOS", font=("Arial", 36, "bold"),bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(10, 0))
+            tk.Label(frame_superior, text="Herramientas y Equipos", font=("Arial", 12),bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack()
 
         frame_nav = tk.Frame(self.root, bg=self.COLOR_AZUL, height=50)
         frame_nav.pack(fill="x")
@@ -158,7 +262,7 @@ class SistemaGEOS:
 
         for i, pestana in enumerate(pestanas):
             color_bg = self.COLOR_AZUL_CLARO if i == 0 else self.COLOR_AZUL
-            btn = tk.Button(frame_pestanas, text=pestana, font=("Arial", 11, "bold"),bg=color_bg, fg="white", relief="flat",cursor="hand2", padx=20, pady=10,command=lambda p=pestana: self.cambiar_pestana(p))
+            btn = tk.Button(frame_pestanas, text=pestana, font=("Arial", 11, "bold"), bg=color_bg, fg="white",relief="flat", cursor="hand2", padx=20, pady=10,command=lambda p=pestana: self.cambiar_pestana(p))
             btn.pack(side="left", padx=2, pady=5, fill="y")
             self.botones_pestanas[pestana] = btn
 
@@ -168,24 +272,24 @@ class SistemaGEOS:
         frame_herramientas = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
         frame_herramientas.pack(fill="x", pady=(0, 15))
 
-        frame_busqueda = tk.Frame(frame_herramientas, bg="white",highlightbackground="#CCCCCC", highlightthickness=1)
+        frame_busqueda = tk.Frame(frame_herramientas, bg="white", highlightbackground="#CCCCCC", highlightthickness=1)
         frame_busqueda.pack(side="left", padx=(0, 10))
 
-        tk.Label(frame_busqueda, text="🔍", font=("Arial", 12),bg="white").pack(side="left", padx=(10, 5))
-        self.entry_buscar = tk.Entry(frame_busqueda, font=("Arial", 11),relief="flat", width=30, bg="white")
+        tk.Label(frame_busqueda, text="🔍", font=("Arial", 12), bg="white").pack(side="left", padx=(10, 5))
+        self.entry_buscar = tk.Entry(frame_busqueda, font=("Arial", 11), relief="flat", width=30, bg="white")
         self.entry_buscar.pack(side="left", padx=(0, 10), pady=8)
         self.entry_buscar.insert(0, "Buscar...")
         self.entry_buscar.bind("<FocusIn>", self.clear_buscar)
         self.entry_buscar.bind("<FocusOut>", self.restore_buscar)
         self.entry_buscar.bind("<KeyRelease>", self.buscar_item)
 
-        tk.Button(frame_herramientas, text="Agregar Nuevo", font=("Arial", 10, "bold"),bg="white", fg=self.COLOR_AZUL, relief="solid",borderwidth=2, cursor="hand2", padx=15, pady=5,command=self.agregar_item).pack(side="left", padx=5)
+        tk.Button(frame_herramientas, text="Agregar Nuevo", font=("Arial", 10, "bold"), bg="white", fg=self.COLOR_AZUL,relief="solid", borderwidth=2, cursor="hand2", padx=15, pady=5, command=self.agregar_item).pack(side="left", padx=5)
 
-        tk.Button(frame_herramientas, text="Editar", font=("Arial", 10, "bold"),bg=self.COLOR_AZUL, fg="white", relief="flat",cursor="hand2", padx=20, pady=5,command=self.editar_item).pack(side="left", padx=5)
+        tk.Button(frame_herramientas, text="Editar", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL, fg="white",relief="flat", cursor="hand2", padx=20, pady=5, command=self.editar_item).pack(side="left", padx=5)
 
-        tk.Button(frame_herramientas, text="Eliminar", font=("Arial", 10, "bold"),bg="#DC3545", fg="white", relief="flat",cursor="hand2", padx=20, pady=5,command=self.eliminar_item).pack(side="left", padx=5)
+        tk.Button(frame_herramientas, text="Eliminar", font=("Arial", 10, "bold"), bg="#DC3545", fg="white",relief="flat", cursor="hand2", padx=20, pady=5, command=self.eliminar_item).pack(side="left", padx=5)
 
-        tk.Button(frame_herramientas, text="📊 Exportar a Excel", font=("Arial", 10, "bold"),bg=self.COLOR_AZUL, fg="white", relief="flat",cursor="hand2", padx=15, pady=5,command=self.exportar_excel).pack(side="right", padx=5)
+        tk.Button(frame_herramientas, text="📊 Exportar a Excel", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL,fg="white", relief="flat", cursor="hand2", padx=15, pady=5, command=self.exportar_excel).pack(side="right", padx=5)
 
         self.crear_tabla()
 
@@ -193,7 +297,7 @@ class SistemaGEOS:
         self.frame_estado.pack(fill="x", side="bottom")
         self.frame_estado.pack_propagate(False)
 
-        self.label_estado = tk.Label(self.frame_estado, text="Total de ítems: 0",font=("Arial", 9), bg="#F0F0F0", fg="#333333")
+        self.label_estado = tk.Label(self.frame_estado, text="Total de ítems: 0", font=("Arial", 9), bg="#F0F0F0",fg="#333333")
         self.label_estado.pack(side="left", padx=20, pady=5)
 
     def crear_tabla(self):
@@ -208,12 +312,12 @@ class SistemaGEOS:
 
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("Treeview",background="white",foreground="#333333",rowheight=30,fieldbackground="white",font=("Arial", 10))
-        style.configure("Treeview.Heading",background=self.COLOR_AZUL,foreground="white",font=("Arial", 10, "bold"),relief="flat")
+        style.configure("Treeview", background="white", foreground="#333333", rowheight=30, fieldbackground="white",font=("Arial", 10))
+        style.configure("Treeview.Heading", background=self.COLOR_AZUL, foreground="white", font=("Arial", 10, "bold"),relief="flat")
         style.map("Treeview", background=[("selected", self.COLOR_AZUL_CLARO)])
 
         columnas = ("ID", "Nombre", "Cantidad", "Precio", "Última Actualización")
-        self.tabla = ttk.Treeview(frame_tabla, columns=columnas, show="headings",yscrollcommand=scroll_y.set,xscrollcommand=scroll_x.set)
+        self.tabla = ttk.Treeview(frame_tabla, columns=columnas, show="headings", yscrollcommand=scroll_y.set,xscrollcommand=scroll_x.set)
 
         self.tabla.heading("ID", text="ID")
         self.tabla.heading("Nombre", text="Nombre del Equipo/Herramienta")
@@ -238,7 +342,9 @@ class SistemaGEOS:
         for item in self.tabla.get_children():
             self.tabla.delete(item)
 
-        for item in self.inventario:
+        inventario = InventarioDB.obtener_todos()
+
+        for item in inventario:
             self.tabla.insert("", "end", values=(
                 item["id"],
                 item["nombre"],
@@ -247,10 +353,9 @@ class SistemaGEOS:
                 item["fecha"]
             ))
 
-        self.actualizar_estado()
+        self.actualizar_estado(len(inventario))
 
-    def actualizar_estado(self):
-        total = len(self.inventario)
+    def actualizar_estado(self, total):
         fecha_hora = datetime.now().strftime("%Y-%m-%d %I:%M %p")
         self.label_estado.config(text=f"Total de ítems: {total} | Última sincronización: {fecha_hora}")
 
@@ -271,9 +376,10 @@ class SistemaGEOS:
         for item in self.tabla.get_children():
             self.tabla.delete(item)
 
-        for item in self.inventario:
-            if (termino in item["id"].lower() or
-                    termino in item["nombre"].lower()):
+        inventario = InventarioDB.obtener_todos()
+
+        for item in inventario:
+            if (termino in item["id"].lower() or termino in item["nombre"].lower()):
                 self.tabla.insert("", "end", values=(
                     item["id"],
                     item["nombre"],
@@ -294,14 +400,15 @@ class SistemaGEOS:
         item = self.tabla.item(seleccion[0])
         valores = item["values"]
 
-        item_completo = None
-        for i in self.inventario:
-            if i["id"] == valores[0]:
-                item_completo = i
-                break
+        item_completo = {
+            "id": valores[0],
+            "nombre": valores[1],
+            "cantidad": valores[2],
+            "precio": float(valores[3].replace("$", "")),
+            "fecha": valores[4]
+        }
 
-        if item_completo:
-            VentanaEditar(self.root, self, item_completo)
+        VentanaEditar(self.root, self, item_completo)
 
     def eliminar_item(self):
         seleccion = self.tabla.selection()
@@ -312,11 +419,13 @@ class SistemaGEOS:
         item = self.tabla.item(seleccion[0])
         valores = item["values"]
 
-        respuesta = messagebox.askyesno("Confirmar",f"¿Está seguro de eliminar el ítem {valores[0]} - {valores[1]}?")
+        respuesta = messagebox.askyesno("Confirmar", f"¿Está seguro de eliminar el ítem {valores[0]} - {valores[1]}?")
         if respuesta:
-            self.inventario = [i for i in self.inventario if i["id"] != valores[0]]
-            self.cargar_datos()
-            messagebox.showinfo("Éxito", "Ítem eliminado correctamente")
+            if InventarioDB.eliminar(valores[0]):
+                self.cargar_datos()
+                messagebox.showinfo("Éxito", "Ítem eliminado correctamente")
+            else:
+                messagebox.showerror("Error", "No se pudo eliminar el ítem")
 
     def exportar_excel(self):
         messagebox.showinfo("Exportar","Funcionalidad de exportación a Excel\n(Requiere librería openpyxl o xlsxwriter)")
@@ -352,33 +461,33 @@ class VentanaAgregar:
 
         COLOR_AZUL = "#0055A5"
 
-        tk.Label(self.ventana, text="Agregar Nuevo Ítem", font=("Arial", 18, "bold"),bg="#FFFFFF", fg=COLOR_AZUL).pack(pady=20)
+        tk.Label(self.ventana, text="Agregar Nuevo Ítem", font=("Arial", 18, "bold"), bg="#FFFFFF", fg=COLOR_AZUL).pack(pady=20)
 
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=40, pady=10, fill="both", expand=True)
 
-        tk.Label(frame_form, text="ID:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=0, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="ID:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=0, column=0, sticky="w",pady=10)
         self.entry_id = tk.Entry(frame_form, font=("Arial", 11), width=30)
         self.entry_id.grid(row=0, column=1, pady=10, padx=10)
 
-        tk.Label(frame_form, text="Nombre:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=1, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="Nombre:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=1, column=0, sticky="w",pady=10)
         self.entry_nombre = tk.Entry(frame_form, font=("Arial", 11), width=30)
         self.entry_nombre.grid(row=1, column=1, pady=10, padx=10)
 
-        tk.Label(frame_form, text="Cantidad:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=2, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="Cantidad:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=2, column=0,sticky="w", pady=10)
         self.entry_cantidad = tk.Entry(frame_form, font=("Arial", 11), width=30)
         self.entry_cantidad.grid(row=2, column=1, pady=10, padx=10)
 
-        tk.Label(frame_form, text="Precio:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=3, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="Precio:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=3, column=0, sticky="w",pady=10)
         self.entry_precio = tk.Entry(frame_form, font=("Arial", 11), width=30)
         self.entry_precio.grid(row=3, column=1, pady=10, padx=10)
 
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
 
-        tk.Button(frame_botones, text="Guardar", font=("Arial", 11, "bold"),bg=COLOR_AZUL, fg="white", relief="flat",cursor="hand2", padx=30, pady=8,command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Guardar", font=("Arial", 11, "bold"), bg=COLOR_AZUL, fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
 
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"),bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8,command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -407,23 +516,12 @@ class VentanaAgregar:
             messagebox.showerror("Error", "Cantidad y precio deben ser valores numéricos")
             return
 
-        for item in self.sistema.inventario:
-            if item["id"] == id_item:
-                messagebox.showerror("Error", "El ID ya existe")
-                return
-
-        nuevo_item = {
-            "id": id_item,
-            "nombre": nombre,
-            "cantidad": cantidad,
-            "precio": precio,
-            "fecha": datetime.now().strftime("%Y-%m-%d")
-        }
-
-        self.sistema.inventario.append(nuevo_item)
-        self.sistema.cargar_datos()
-        messagebox.showinfo("Éxito", "Ítem agregado correctamente")
-        self.ventana.destroy()
+        if InventarioDB.agregar(id_item, nombre, cantidad, precio):
+            self.sistema.cargar_datos()
+            messagebox.showinfo("Éxito", "Ítem agregado correctamente")
+            self.ventana.destroy()
+        else:
+            messagebox.showerror("Error", "El ID ya existe en la base de datos")
 
 
 class VentanaEditar:
@@ -442,27 +540,27 @@ class VentanaEditar:
 
         COLOR_AZUL = "#0055A5"
 
-        tk.Label(self.ventana, text="Editar Ítem", font=("Arial", 18, "bold"),bg="#FFFFFF", fg=COLOR_AZUL).pack(pady=20)
+        tk.Label(self.ventana, text="Editar Ítem", font=("Arial", 18, "bold"), bg="#FFFFFF", fg=COLOR_AZUL).pack(pady=20)
 
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=40, pady=10, fill="both", expand=True)
 
-        tk.Label(frame_form, text="ID:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=0, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="ID:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=0, column=0, sticky="w",pady=10)
         self.entry_id = tk.Entry(frame_form, font=("Arial", 11), width=30, state="disabled")
         self.entry_id.grid(row=0, column=1, pady=10, padx=10)
         self.entry_id.insert(0, item["id"])
 
-        tk.Label(frame_form, text="Nombre:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=1, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="Nombre:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=1, column=0, sticky="w",pady=10)
         self.entry_nombre = tk.Entry(frame_form, font=("Arial", 11), width=30)
         self.entry_nombre.grid(row=1, column=1, pady=10, padx=10)
         self.entry_nombre.insert(0, item["nombre"])
 
-        tk.Label(frame_form, text="Cantidad:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=2, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="Cantidad:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=2, column=0,sticky="w", pady=10)
         self.entry_cantidad = tk.Entry(frame_form, font=("Arial", 11), width=30)
         self.entry_cantidad.grid(row=2, column=1, pady=10, padx=10)
         self.entry_cantidad.insert(0, item["cantidad"])
 
-        tk.Label(frame_form, text="Precio:", font=("Arial", 11, "bold"),bg="#FFFFFF").grid(row=3, column=0, sticky="w", pady=10)
+        tk.Label(frame_form, text="Precio:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=3, column=0, sticky="w",pady=10)
         self.entry_precio = tk.Entry(frame_form, font=("Arial", 11), width=30)
         self.entry_precio.grid(row=3, column=1, pady=10, padx=10)
         self.entry_precio.insert(0, item["precio"])
@@ -470,9 +568,9 @@ class VentanaEditar:
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
 
-        tk.Button(frame_botones, text="Guardar Cambios", font=("Arial", 11, "bold"),bg=COLOR_AZUL, fg="white", relief="flat",cursor="hand2", padx=30, pady=8,command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Guardar Cambios", font=("Arial", 11, "bold"), bg=COLOR_AZUL, fg="white",relief="flat", cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
 
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"),bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8,command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -500,14 +598,12 @@ class VentanaEditar:
             messagebox.showerror("Error", "Cantidad y precio deben ser valores numéricos")
             return
 
-        self.item_original["nombre"] = nombre
-        self.item_original["cantidad"] = cantidad
-        self.item_original["precio"] = precio
-        self.item_original["fecha"] = datetime.now().strftime("%Y-%m-%d")
-
-        self.sistema.cargar_datos()
-        messagebox.showinfo("Éxito", "Ítem actualizado correctamente")
-        self.ventana.destroy()
+        if InventarioDB.actualizar(self.item_original["id"], nombre, cantidad, precio):
+            self.sistema.cargar_datos()
+            messagebox.showinfo("Éxito", "Ítem actualizado correctamente")
+            self.ventana.destroy()
+        else:
+            messagebox.showerror("Error", "No se pudo actualizar el ítem")
 
 
 if __name__ == "__main__":
