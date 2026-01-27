@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="agregado del logo de la empresa">
-      <change beforePath="$PROJECT_DIR$/Proyecto_01.py" beforeDir="false" afterPath="$PROJECT_DIR$/Proyecto_01.py" afterDir="false" />
+    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="Agregado de proveedores, aactualización de información del inventario">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/geos_inventario.db" beforeDir="false" afterPath="$PROJECT_DIR$/geos_inventario.db" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -180,7 +181,15 @@
       <option name="project" value="LOCAL" />
       <updated>1769468353806</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Agregado de proveedores, aactualización de información del inventario">
+      <option name="closed" value="true" />
+      <created>1769472901047</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1769472901047</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -209,6 +218,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Agregado de modelo de inventario" />
     <MESSAGE value="agregado del logo de la empresa" />
-    <option name="LAST_COMMIT_MESSAGE" value="agregado del logo de la empresa" />
+    <MESSAGE value="Agregado de proveedores, aactualización de información del inventario" />
+    <option name="LAST_COMMIT_MESSAGE" value="Agregado de proveedores, aactualización de información del inventario" />
   </component>
 </project>
