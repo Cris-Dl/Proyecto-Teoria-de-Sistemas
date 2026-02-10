@@ -93,7 +93,6 @@ class CategoriasDB:
         finally:
             conn.close()
 
-
 class ProductosDB:
     @staticmethod
     def obtener_todos():
