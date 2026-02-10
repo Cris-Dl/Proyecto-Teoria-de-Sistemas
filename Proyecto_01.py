@@ -55,7 +55,6 @@ class TablasDB:
                 total REAL
             );
         """)
-
         conn.commit()
         return conn
 
