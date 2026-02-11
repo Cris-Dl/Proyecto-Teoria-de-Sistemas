@@ -1,8 +1,10 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import sqlite3
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 
 class TablasDB:
@@ -13,7 +15,6 @@ class TablasDB:
         conn = sqlite3.connect(TablasDB.DB_NAME)
         conn.row_factory = sqlite3.Row
 
-        # Tabla Proveedores
         conn.execute("""
             CREATE TABLE IF NOT EXISTS proveedores (
                 id_num INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +26,6 @@ class TablasDB:
             );
         """)
 
-        # Tabla Productos
         conn.execute("""
             CREATE TABLE IF NOT EXISTS productos (
                 id_num INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +39,6 @@ class TablasDB:
             );
         """)
 
-        # Tabla Categorías
         conn.execute("""
             CREATE TABLE IF NOT EXISTS categorias (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +46,6 @@ class TablasDB:
             );
         """)
 
-        # Tabla Historial Ventas
         conn.execute("""
             CREATE TABLE IF NOT EXISTS ventas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,6 +240,191 @@ class ProveedoresDB:
         finally:
             conn.close()
 
+
+class GeneradorRecibos:
+    @staticmethod
+    def generar_recibo(carrito, total, nit_receptor="C/F"):
+        carpeta_recibos = "recibos"
+        if not os.path.exists(carpeta_recibos):
+            os.makedirs(carpeta_recibos)
+
+        fecha_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nombre_archivo = os.path.join(carpeta_recibos, f"recibo_{fecha_str}.pdf")
+
+
+        c = canvas.Canvas(nombre_archivo, pagesize=letter)
+        width, height = letter
+
+
+        margen_izq = 40
+        margen_der = width - 40
+        y = height - 40
+
+
+        c.setFillColorRGB(0.2, 0.4, 0.7)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawCentredString(width / 2, y, "Factura")
+        y -= 25
+
+
+        c.setStrokeColorRGB(0.2, 0.4, 0.7)
+        c.setLineWidth(2)
+        c.line(margen_izq, y, margen_der, y)
+        y -= 25
+
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margen_izq, y, "GEOS HERRAMIENTAS Y EQUIPOS")
+        y -= 15
+
+        c.setFont("Helvetica", 9)
+        c.drawString(margen_izq, y, "NIT Emisor: 505303K")
+        y -= 12
+        c.drawString(margen_izq, y, "7 CALLE 2-27 zona 2, QUETZALTENANGO, QUETZALTENANGO")
+        y -= 12
+        c.drawString(margen_izq, y, f"NIT Receptor: {nit_receptor}")
+        y -= 12
+        c.drawString(margen_izq, y, "Nombre Receptor: CLIENTE FINAL")
+        y -= 25
+
+        fecha_actual = datetime.now()
+        fecha_emision = fecha_actual.strftime("%d-%b-%Y %H:%M:%S")
+        numero_factura = fecha_actual.strftime("%Y%m%d%H%M%S")
+
+        info_y = height - 90
+        c.setFont("Helvetica-Bold", 8)
+        c.drawRightString(margen_der, info_y, "NÚMERO DE AUTORIZACIÓN:")
+        info_y -= 10
+        c.setFont("Helvetica", 8)
+        c.drawRightString(margen_der, info_y, "C0DB78AF-8E1A-4310-EB91-B232BA85F45")
+        info_y -= 12
+        c.setFont("Helvetica-Bold", 8)
+        c.drawRightString(margen_der, info_y, "Serie: C0DB78AF-8E1A")
+        info_y -= 10
+        c.drawRightString(margen_der, info_y, f"Número Acceso: {numero_factura}")
+        info_y -= 12
+        c.setFont("Helvetica", 8)
+        c.drawRightString(margen_der, info_y, f"Fecha y hora de emisión: {fecha_emision}")
+        info_y -= 10
+        c.drawRightString(margen_der, info_y, f"Fecha y hora de certificación: {fecha_emision}")
+        info_y -= 10
+        c.drawRightString(margen_der, info_y, "Moneda: GTQ")
+        y -= 10
+
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(1)
+        c.line(margen_izq, y, margen_der, y)
+        y -= 20
+
+
+        tabla_y = y
+        c.setFillColorRGB(0.9, 0.9, 0.9)
+        c.rect(margen_izq, tabla_y - 15, margen_der - margen_izq, 15, fill=1, stroke=0)
+
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica-Bold", 9)
+        col_no = margen_izq + 5
+        col_bs = margen_izq + 35
+        col_cant = margen_izq + 75
+        col_desc = margen_izq + 135
+        col_precio = margen_der - 180
+        col_desc_q = margen_der - 120
+        col_otros = margen_der - 80
+        col_total = margen_der - 10
+
+        c.drawString(col_no, tabla_y - 10, "P. U")
+        c.drawString(col_bs, tabla_y - 10, "IVA (Q)")
+        c.drawString(col_cant, tabla_y - 10, "Cantidad")
+        c.drawString(col_desc, tabla_y - 10, "Descripcion")
+        c.drawRightString(col_precio + 50, tabla_y - 10, "Precio(Q)")
+        c.drawRightString(col_desc_q + 30, tabla_y - 10, "Otros")
+        c.drawRightString(col_total + 30, tabla_y - 10, "Total (Q)")
+
+        y = tabla_y - 20
+
+        c.setLineWidth(0.5)
+        c.line(margen_izq, y, margen_der, y)
+        y -= 15
+
+        c.setFont("Helvetica", 9)
+        item_num = 1
+
+        for item in carrito:
+            if y < 150:
+                c.showPage()
+                y = height - 50
+                c.setFont("Helvetica", 9)
+
+
+            c.drawString(col_no, y, str(item_num))
+
+            c.drawString(col_bs, y, "Bien")
+
+            c.drawString(col_cant, y, f"{item['cantidad']:.0f}")
+
+            descripcion = f"{item['nombre']}"
+            if len(descripcion) > 35:
+                descripcion = descripcion[:32] + "..."
+            c.drawString(col_desc, y, descripcion)
+            c.setFont("Helvetica", 8)
+            c.drawString(col_desc, y - 8, f"Código: {item['codigo']}")
+            c.setFont("Helvetica", 9)
+
+            c.drawRightString(col_precio + 50, y, f"{item['precio']:.2f}")
+
+            c.drawRightString(col_desc_q + 30, y, "0.00")
+
+            c.drawRightString(col_otros + 30, y, "0.00")
+
+            subtotal = item['cantidad'] * item['precio']
+            c.drawRightString(col_total + 30, y, f"{subtotal:.2f}")
+
+            y -= 25
+            item_num += 1
+
+        y -= 10
+        c.setLineWidth(1)
+        c.line(margen_izq, y, margen_der, y)
+        y -= 20
+
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(col_desc, y, "TOTALES:")
+        c.drawRightString(col_desc_q + 30, y, "0.00")
+        c.drawRightString(col_otros + 30, y, "0.00")
+        c.drawRightString(col_total + 30, y, f"{total:.2f}")
+
+        y -= 30
+
+        c.setLineWidth(1)
+        c.rect(margen_izq, y - 80, margen_der - margen_izq, 80)
+
+        c.setFont("Helvetica-Bold", 10)
+        c.drawCentredString(width / 2, y - 15, "COMPLEMENTO FACTURA")
+
+        c.setFont("Helvetica", 9)
+        c.drawString(margen_izq + 10, y - 35, "Número de abono")
+        c.drawString(margen_izq + 150, y - 35, "Fecha de vencimiento")
+        c.drawString(margen_izq + 330, y - 35, "Monto del abono (Q)")
+
+        c.drawString(margen_izq + 60, y - 55, "1")
+        fecha_venc = (fecha_actual + timedelta(days=30)).strftime("%d/%m/%Y")
+        c.drawString(margen_izq + 180, y - 55, fecha_venc)
+        c.drawRightString(margen_der - 90, y - 55, f"{total:.2f}")
+
+        c.drawString(margen_izq + 150, y - 70, "TOTALES:")
+        c.drawRightString(margen_der - 90, y - 70, f"{total:.2f}")
+
+        y -= 100
+
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(width / 2, 50, "* Sujeto a pagos trimestrales ISR")
+        c.drawCentredString(width / 2, 40, "Datos del certificador")
+        c.drawCentredString(width / 2, 30, "Superintendencia de Administracion Tributaria NIT: 16693949")
+
+        c.save()
+        return nombre_archivo
+
+
 class Login:
     def __init__(self, root):
         self.root = root
@@ -265,33 +448,43 @@ class Login:
             self.label_logo = tk.Label(self.root, image=self.imagen, bg=self.COLOR_FONDO)
             self.label_logo.pack(pady=(60, 80))
         except:
-            tk.Label(self.root, text="GEOS", font=("Arial", 48, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(60, 20))
-            tk.Label(self.root, text="Herramientas y Equipos", font=("Arial", 14), bg=self.COLOR_FONDO,fg=self.COLOR_AZUL).pack(pady=(0, 60))
+            tk.Label(self.root, text="GEOS", font=("Arial", 48, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(
+                pady=(60, 20))
+            tk.Label(self.root, text="Herramientas y Equipos", font=("Arial", 14), bg=self.COLOR_FONDO,
+                     fg=self.COLOR_AZUL).pack(pady=(0, 60))
 
         self.frame_login = tk.Frame(self.root, bg=self.COLOR_FONDO)
         self.frame_login.pack()
 
-        self.frame_user = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG, highlightbackground=self.COLOR_AZUL,highlightthickness=2)
+        self.frame_user = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG, highlightbackground=self.COLOR_AZUL,
+                                   highlightthickness=2)
         self.frame_user.pack(pady=(0, 20))
-        tk.Label(self.frame_user, text="👤", font=("Arial", 14), bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(side="left", padx=(15, 5))
-        self.entry_user = tk.Entry(self.frame_user, font=("Arial", 12), bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,relief="flat", width=28)
+        tk.Label(self.frame_user, text="👤", font=("Arial", 14), bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(
+            side="left", padx=(15, 5))
+        self.entry_user = tk.Entry(self.frame_user, font=("Arial", 12), bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,
+                                   relief="flat", width=28)
         self.entry_user.pack(side="left", padx=(5, 15), pady=15)
         self.entry_user.insert(0, "Usuario")
         self.entry_user.bind("<FocusIn>", self.clear_placeholder_user)
         self.entry_user.bind("<FocusOut>", self.restore_placeholder_user)
         self.entry_user.bind("<Return>", lambda event: self.login())
 
-        self.frame_pass = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG, highlightbackground=self.COLOR_AZUL,highlightthickness=2)
+        self.frame_pass = tk.Frame(self.frame_login, bg=self.COLOR_INPUT_BG, highlightbackground=self.COLOR_AZUL,
+                                   highlightthickness=2)
         self.frame_pass.pack(pady=(0, 40))
-        tk.Label(self.frame_pass, text="🔒", font=("Arial", 14), bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(side="left", padx=(15, 5))
-        self.entry_password = tk.Entry(self.frame_pass, font=("Arial", 12), bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,relief="flat", width=28)
+        tk.Label(self.frame_pass, text="🔒", font=("Arial", 14), bg=self.COLOR_INPUT_BG, fg=self.COLOR_AZUL).pack(
+            side="left", padx=(15, 5))
+        self.entry_password = tk.Entry(self.frame_pass, font=("Arial", 12), bg=self.COLOR_INPUT_BG, fg=self.COLOR_TEXTO,
+                                       relief="flat", width=28)
         self.entry_password.pack(side="left", padx=(5, 15), pady=15)
         self.entry_password.insert(0, "Contraseña")
         self.entry_password.bind("<FocusIn>", self.clear_placeholder_pass)
         self.entry_password.bind("<FocusOut>", self.restore_placeholder_pass)
         self.entry_password.bind("<Return>", lambda event: self.login())
 
-        self.boton_login = tk.Button(self.frame_login, text="INICIAR SESIÓN", bg=self.COLOR_AZUL, fg="white",font=("Arial", 12, "bold"), relief="flat", cursor="hand2", width=32, height=2,command=self.login)
+        self.boton_login = tk.Button(self.frame_login, text="INICIAR SESIÓN", bg=self.COLOR_AZUL, fg="white",
+                                     font=("Arial", 12, "bold"), relief="flat", cursor="hand2", width=32, height=2,
+                                     command=self.login)
         self.boton_login.pack()
 
     def centrar_ventana(self, ancho, alto):
@@ -376,8 +569,10 @@ class SistemaGEOS:
             label_logo = tk.Label(frame_superior, image=self.imagen, bg=self.COLOR_FONDO)
             label_logo.pack(pady=20)
         except:
-            tk.Label(frame_superior, text="GEOS", font=("Arial", 36, "bold"), bg=self.COLOR_FONDO,fg=self.COLOR_AZUL).pack(pady=(10, 0))
-            tk.Label(frame_superior, text="Herramientas y Equipos", font=("Arial", 12), bg=self.COLOR_FONDO,fg=self.COLOR_AZUL).pack()
+            tk.Label(frame_superior, text="GEOS", font=("Arial", 36, "bold"), bg=self.COLOR_FONDO,
+                     fg=self.COLOR_AZUL).pack(pady=(10, 0))
+            tk.Label(frame_superior, text="Herramientas y Equipos", font=("Arial", 12), bg=self.COLOR_FONDO,
+                     fg=self.COLOR_AZUL).pack()
 
         frame_nav = tk.Frame(self.root, bg=self.COLOR_AZUL, height=50)
         frame_nav.pack(fill="x")
@@ -391,7 +586,9 @@ class SistemaGEOS:
 
         for i, pestana in enumerate(pestanas):
             color_bg = self.COLOR_AZUL_CLARO if i == 0 else self.COLOR_AZUL
-            btn = tk.Button(frame_pestanas, text=pestana, font=("Arial", 11, "bold"), bg=color_bg, fg="white",relief="flat", cursor="hand2", padx=20, pady=10,command=lambda p=pestana: self.cambiar_pestana(p))
+            btn = tk.Button(frame_pestanas, text=pestana, font=("Arial", 11, "bold"), bg=color_bg, fg="white",
+                            relief="flat", cursor="hand2", padx=20, pady=10,
+                            command=lambda p=pestana: self.cambiar_pestana(p))
             btn.pack(side="left", padx=2, pady=5, fill="y")
             self.botones_pestanas[pestana] = btn
 
@@ -415,11 +612,19 @@ class SistemaGEOS:
             self.mostrar_proveedores()
         else:
             for widget in self.frame_contenido.winfo_children(): widget.destroy()
-            tk.Label(self.frame_contenido, text=f"Sección {pestana} en construcción", font=("Arial", 14),bg="white").pack(pady=50)
-
+            tk.Label(self.frame_contenido, text=f"Sección {pestana} en construcción", font=("Arial", 14),
+                     bg="white").pack(pady=50)
 
     def mostrar_ventas(self):
         for widget in self.frame_contenido.winfo_children(): widget.destroy()
+
+        frame_nit = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
+        frame_nit.pack(fill="x", pady=5, padx=20)
+        tk.Label(frame_nit, text="NIT Receptor:", font=("Arial", 10, "bold"), bg=self.COLOR_FONDO).pack(side="left", padx=5)
+        self.entry_nit_receptor = tk.Entry(frame_nit, font=("Arial", 10), width=15)
+        self.entry_nit_receptor.pack(side="left", padx=5)
+        self.entry_nit_receptor.insert(0, "C/F")
+        tk.Label(frame_nit, text="(C/F para consumidor final)", font=("Arial", 8, "italic"), bg=self.COLOR_FONDO, fg="#666").pack(side="left", padx=5)
 
         paned = tk.PanedWindow(self.frame_contenido, orient="horizontal", bg="#DDDDDD", sashwidth=5)
         paned.pack(fill="both", expand=True)
@@ -427,25 +632,29 @@ class SistemaGEOS:
         frame_izq = tk.Frame(paned, bg="white", width=600)
         paned.add(frame_izq)
 
-        tk.Label(frame_izq, text="CATÁLOGO DE PRODUCTOS", font=("Arial", 12, "bold"), bg="white",fg=self.COLOR_AZUL).pack(pady=10)
+        tk.Label(frame_izq, text="CATÁLOGO DE PRODUCTOS", font=("Arial", 12, "bold"), bg="white",
+                 fg=self.COLOR_AZUL).pack(pady=10)
 
         frame_busqueda_v = tk.Frame(frame_izq, bg="white")
         frame_busqueda_v.pack(fill="x", padx=10, pady=5)
-        tk.Label(frame_busqueda_v, text="Buscar (Nombre, Código, Categ.):", font=("Arial", 10), bg="white").pack(side="left")
+        tk.Label(frame_busqueda_v, text="Buscar (Nombre, Código, Categ.):", font=("Arial", 10), bg="white").pack(
+            side="left")
         self.entry_buscar_venta = tk.Entry(frame_busqueda_v, font=("Arial", 10), width=30)
         self.entry_buscar_venta.pack(side="left", padx=5)
 
         self.entry_buscar_venta.bind("<KeyRelease>", self.filtrar_productos_venta)
 
-        col_v = ("ID", "Nombre", "Precio", "Stock", "Categoria")
+        col_v = ("ID", "Codigo", "Nombre", "Precio", "Stock", "Categoria")
         self.tabla_prod_venta = ttk.Treeview(frame_izq, columns=col_v, show="headings", height=15)
         self.tabla_prod_venta.heading("ID", text="ID")
+        self.tabla_prod_venta.heading("Codigo", text="Código")
         self.tabla_prod_venta.heading("Nombre", text="Producto")
         self.tabla_prod_venta.heading("Precio", text="Precio")
         self.tabla_prod_venta.heading("Stock", text="Stock")
         self.tabla_prod_venta.heading("Categoria", text="Categoria")
 
         self.tabla_prod_venta.column("ID", width=40)
+        self.tabla_prod_venta.column("Codigo", width=80)
         self.tabla_prod_venta.column("Nombre", width=200)
         self.tabla_prod_venta.column("Precio", width=80)
         self.tabla_prod_venta.column("Stock", width=60)
@@ -464,7 +673,8 @@ class SistemaGEOS:
         self.spin_cantidad = tk.Spinbox(frame_agregar, from_=1, to=100, width=5, font=("Arial", 11))
         self.spin_cantidad.pack(side="left", padx=5)
 
-        btn_add = tk.Button(frame_agregar, text="AGREGAR AL CARRITO >>", bg="#28A745", fg="white",font=("Arial", 10, "bold"),command=self.agregar_al_carrito, cursor="hand2")
+        btn_add = tk.Button(frame_agregar, text="AGREGAR AL CARRITO >>", bg="#28A745", fg="white",
+                            font=("Arial", 10, "bold"), command=self.agregar_al_carrito, cursor="hand2")
         btn_add.pack(side="right", padx=20)
 
         frame_der = tk.Frame(paned, bg="white", width=400)
@@ -487,10 +697,12 @@ class SistemaGEOS:
         frame_totales = tk.Frame(frame_der, bg="#F8F9FA", pady=20)
         frame_totales.pack(fill="x", side="bottom")
 
-        self.lbl_total_pagar = tk.Label(frame_totales, text="TOTAL: $0.00", font=("Arial", 20, "bold"), bg="#F8F9FA",fg="#333333")
+        self.lbl_total_pagar = tk.Label(frame_totales, text="TOTAL: Q0.00", font=("Arial", 12, "bold"), bg="#F8F9FA",
+                                        fg="#333333")
         self.lbl_total_pagar.pack()
 
-        btn_cobrar = tk.Button(frame_totales, text="REALIZAR VENTA", bg=self.COLOR_AZUL, fg="white",font=("Arial", 14, "bold"), width=20, command=self.finalizar_venta, cursor="hand2")
+        btn_cobrar = tk.Button(frame_totales, text="REALIZAR VENTA", bg=self.COLOR_AZUL, fg="white",
+                               font=("Arial", 14, "bold"), width=20, command=self.finalizar_venta, cursor="hand2")
         btn_cobrar.pack(pady=15)
 
         tk.Button(frame_totales, text="Limpiar Carrito", command=self.limpiar_carrito).pack()
@@ -502,7 +714,9 @@ class SistemaGEOS:
         productos = ProductosDB.obtener_todos()
         for p in productos:
             if p["cantidad"] > 0:
-                self.tabla_prod_venta.insert("", "end",values=(p["id_num"], p["nombre"], f"${p['precio_venta']}", p["cantidad"],p["categoria"]))
+                self.tabla_prod_venta.insert("", "end",
+                                             values=(p["id_num"], p["codigo"], p["nombre"], f"${p['precio_venta']}",
+                                                     p["cantidad"], p["categoria"]))
 
     def filtrar_productos_venta(self, event):
         filtro = self.entry_buscar_venta.get().lower()
@@ -516,7 +730,9 @@ class SistemaGEOS:
             coincide_categoria = filtro in p["categoria"].lower()
 
             if (p["cantidad"] > 0 and (coincide_nombre or coincide_codigo or coincide_categoria)):
-                self.tabla_prod_venta.insert("", "end",values=(p["id_num"], p["nombre"], f"${p['precio_venta']}", p["cantidad"],p["categoria"]))
+                self.tabla_prod_venta.insert("", "end",
+                                             values=(p["id_num"], p["codigo"], p["nombre"], f"${p['precio_venta']}",
+                                                     p["cantidad"], p["categoria"]))
 
     def agregar_al_carrito(self):
         seleccion = self.tabla_prod_venta.selection()
@@ -527,9 +743,10 @@ class SistemaGEOS:
         item = self.tabla_prod_venta.item(seleccion[0])
         valores = item["values"]
         id_prod = valores[0]
-        nombre = valores[1]
-        precio = float(str(valores[2]).replace("$", ""))
-        stock_disp = float(valores[3])
+        codigo = valores[1]
+        nombre = valores[2]
+        precio = float(str(valores[3]).replace("$", ""))
+        stock_disp = float(valores[4])
 
         try:
             cantidad = float(self.spin_cantidad.get())
@@ -548,6 +765,7 @@ class SistemaGEOS:
 
         self.carrito_compras.append({
             "id": id_prod,
+            "codigo": codigo,
             "nombre": nombre,
             "cantidad": cantidad,
             "precio": precio,
@@ -584,7 +802,22 @@ class SistemaGEOS:
                     exito = False
 
             if exito:
-                messagebox.showinfo("Venta Exitosa", "La venta se ha registrado y el inventario actualizado.")
+                total = sum(item["cantidad"] * item["precio"] for item in self.carrito_compras)
+
+                nit_receptor = self.entry_nit_receptor.get().strip()
+                if not nit_receptor:
+                    nit_receptor = "C/F"
+
+                try:
+                    archivo_recibo = GeneradorRecibos.generar_recibo(self.carrito_compras, total, nit_receptor)
+                    messagebox.showinfo("Venta Exitosa",
+                                        f"La venta se ha registrado y el inventario actualizado.\n\n" +
+                                        f"Recibo generado: {archivo_recibo}")
+                except Exception as e:
+                    messagebox.showinfo("Venta Exitosa",
+                                        "La venta se ha registrado y el inventario actualizado.\n\n" +
+                                        f"(No se pudo generar el recibo PDF: {str(e)})")
+
                 self.limpiar_carrito()
                 self.cargar_productos_venta()
             else:
@@ -601,12 +834,15 @@ class SistemaGEOS:
 
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("Treeview", background="white", foreground="#333333", rowheight=30, fieldbackground="white",font=("Arial", 10))
-        style.configure("Treeview.Heading", background=self.COLOR_AZUL, foreground="white", font=("Arial", 10, "bold"),relief="flat")
+        style.configure("Treeview", background="white", foreground="#333333", rowheight=30, fieldbackground="white",
+                        font=("Arial", 10))
+        style.configure("Treeview.Heading", background=self.COLOR_AZUL, foreground="white", font=("Arial", 10, "bold"),
+                        relief="flat")
         style.map("Treeview", background=[("selected", self.COLOR_AZUL_CLARO)])
 
         columnas = ("ID_NUM", "Codigo", "Nombre", "Categoria", "Cantidad", "P.Compra", "P.Venta", "Proveedor")
-        self.tabla = ttk.Treeview(frame_tabla, columns=columnas, show="headings", yscrollcommand=scroll_y.set,xscrollcommand=scroll_x.set)
+        self.tabla = ttk.Treeview(frame_tabla, columns=columnas, show="headings", yscrollcommand=scroll_y.set,
+                                  xscrollcommand=scroll_x.set)
 
         self.tabla.heading("ID_NUM", text="ID")
         self.tabla.heading("Codigo", text="Código")
@@ -705,7 +941,8 @@ class SistemaGEOS:
                 messagebox.showerror("Error", "No se pudo eliminar el producto")
 
     def exportar_excel(self):
-        messagebox.showinfo("Exportar","Funcionalidad de exportación a Excel\n(Requiere librería openpyxl o xlsxwriter)")
+        messagebox.showinfo("Exportar",
+                            "Funcionalidad de exportación a Excel\n(Requiere librería openpyxl o xlsxwriter)")
 
     def agregar_categoria(self):
         VentanaAgregarCategoria(self.root, self)
@@ -731,15 +968,20 @@ class SistemaGEOS:
         def crear_boton_azul(text, command):
             frame_border = tk.Frame(frame_herramientas, bg=self.COLOR_AZUL, padx=2, pady=2)
             frame_border.pack(side="left", padx=5)
-            tk.Button(frame_border, text=text, font=("Arial", 10, "bold"), bg="white", fg=self.COLOR_AZUL,relief="flat", cursor="hand2", command=command).pack(fill="both", expand=True)
+            tk.Button(frame_border, text=text, font=("Arial", 10, "bold"), bg="white", fg=self.COLOR_AZUL,
+                      relief="flat", cursor="hand2", command=command).pack(fill="both", expand=True)
 
         crear_boton_azul("Agregar Producto", self.agregar_item)
         crear_boton_azul("Agregar Categoría", self.agregar_categoria)
         crear_boton_azul("Eliminar Categoría", self.eliminar_categoria)
 
-        tk.Button(frame_herramientas, text="Editar", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL, fg="white",relief="flat", cursor="hand2", padx=20, pady=5, command=self.editar_item).pack(side="left", padx=5)
-        tk.Button(frame_herramientas, text="Eliminar", font=("Arial", 10, "bold"), bg="#DC3545", fg="white",relief="flat", cursor="hand2", padx=20, pady=5, command=self.eliminar_item).pack(side="left", padx=5)
-        tk.Button(frame_herramientas, text="📊 Exportar a Excel", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL,fg="white", relief="flat", cursor="hand2", padx=15, pady=5, command=self.exportar_excel).pack(side="right", padx=5)
+        tk.Button(frame_herramientas, text="Editar", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL, fg="white",
+                  relief="flat", cursor="hand2", padx=20, pady=5, command=self.editar_item).pack(side="left", padx=5)
+        tk.Button(frame_herramientas, text="Eliminar", font=("Arial", 10, "bold"), bg="#DC3545", fg="white",
+                  relief="flat", cursor="hand2", padx=20, pady=5, command=self.eliminar_item).pack(side="left", padx=5)
+        tk.Button(frame_herramientas, text="📊 Exportar a Excel", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL,
+                  fg="white", relief="flat", cursor="hand2", padx=15, pady=5, command=self.exportar_excel).pack(
+            side="right", padx=5)
 
         self.crear_tabla()
         self.cargar_datos()
@@ -759,9 +1001,15 @@ class SistemaGEOS:
         self.entry_buscar_proveedor.bind("<FocusOut>", self.restore_buscar_proveedor)
         self.entry_buscar_proveedor.bind("<KeyRelease>", self.buscar_proveedor)
 
-        tk.Button(frame_herramientas, text="Agregar Proveedor", font=("Arial", 10, "bold"), bg="white",fg=self.COLOR_AZUL, relief="solid", borderwidth=2, cursor="hand2", padx=15, pady=5,command=self.agregar_proveedor).pack(side="left", padx=5)
-        tk.Button(frame_herramientas, text="Editar", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL, fg="white",relief="flat", cursor="hand2", padx=20, pady=5, command=self.editar_proveedor).pack(side="left",padx=5)
-        tk.Button(frame_herramientas, text="Eliminar", font=("Arial", 10, "bold"), bg="#DC3545", fg="white",relief="flat", cursor="hand2", padx=20, pady=5, command=self.eliminar_proveedor).pack(side="left",padx=5)
+        tk.Button(frame_herramientas, text="Agregar Proveedor", font=("Arial", 10, "bold"), bg="white",
+                  fg=self.COLOR_AZUL, relief="solid", borderwidth=2, cursor="hand2", padx=15, pady=5,
+                  command=self.agregar_proveedor).pack(side="left", padx=5)
+        tk.Button(frame_herramientas, text="Editar", font=("Arial", 10, "bold"), bg=self.COLOR_AZUL, fg="white",
+                  relief="flat", cursor="hand2", padx=20, pady=5, command=self.editar_proveedor).pack(side="left",
+                                                                                                      padx=5)
+        tk.Button(frame_herramientas, text="Eliminar", font=("Arial", 10, "bold"), bg="#DC3545", fg="white",
+                  relief="flat", cursor="hand2", padx=20, pady=5, command=self.eliminar_proveedor).pack(side="left",
+                                                                                                        padx=5)
 
         frame_tabla = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
         frame_tabla.pack(fill="both", expand=True)
@@ -769,7 +1017,8 @@ class SistemaGEOS:
         scrollbar.pack(side="right", fill="y")
 
         columnas = ("ID", "Nombre", "Código", "Teléfono", "Encargado", "Información")
-        self.tabla_proveedores = ttk.Treeview(frame_tabla, columns=columnas, show="headings",yscrollcommand=scrollbar.set, height=20)
+        self.tabla_proveedores = ttk.Treeview(frame_tabla, columns=columnas, show="headings",
+                                              yscrollcommand=scrollbar.set, height=20)
         scrollbar.config(command=self.tabla_proveedores.yview)
         for col, width in zip(columnas, [50, 200, 100, 100, 150, 250]):
             self.tabla_proveedores.heading(col, text=col)
@@ -798,7 +1047,8 @@ class SistemaGEOS:
         for item in self.tabla_proveedores.get_children(): self.tabla_proveedores.delete(item)
         proveedores = ProveedoresDB.obtener_todos()
         for prov in proveedores:
-            if (termino in str(prov["nombre"]).lower() or termino in str(prov["codigo"]).lower() or termino in str(prov["telefono"]).lower()):
+            if (termino in str(prov["nombre"]).lower() or termino in str(prov["codigo"]).lower() or termino in str(
+                    prov["telefono"]).lower()):
                 self.tabla_proveedores.insert("", "end", values=(
                     prov["id_num"], prov["nombre"], prov["codigo"], prov["telefono"],
                     prov["encargado"], prov["informacion"]))
@@ -840,6 +1090,7 @@ class SistemaGEOS:
             self.cargar_proveedores()
             messagebox.showinfo("Éxito", "Proveedor eliminado correctamente")
 
+
 class VentanaAgregarCategoria:
     def __init__(self, parent, sistema):
         self.sistema = sistema
@@ -852,7 +1103,8 @@ class VentanaAgregarCategoria:
         self.ventana.grab_set()
         self.centrar_ventana()
 
-        tk.Label(self.ventana, text="Nueva Categoría", font=("Arial", 14, "bold"), bg="#FFFFFF", fg="#0055A5").pack(pady=20)
+        tk.Label(self.ventana, text="Nueva Categoría", font=("Arial", 14, "bold"), bg="#FFFFFF", fg="#0055A5").pack(
+            pady=20)
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=20, pady=5)
         tk.Label(frame_form, text="Nombre:", font=("Arial", 10, "bold"), bg="#FFFFFF").pack(side="left", padx=5)
@@ -861,8 +1113,10 @@ class VentanaAgregarCategoria:
         self.entry_nombre.focus()
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
-        tk.Button(frame_botones, text="Guardar", font=("Arial", 10, "bold"), bg="#0055A5", fg="white", relief="flat",cursor="hand2", padx=20, pady=5, command=self.guardar).pack(side="left", padx=10)
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 10, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=20, pady=5, command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Guardar", font=("Arial", 10, "bold"), bg="#0055A5", fg="white", relief="flat",
+                  cursor="hand2", padx=20, pady=5, command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 10, "bold"), bg="#6C757D", fg="white", relief="flat",
+                  cursor="hand2", padx=20, pady=5, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -892,7 +1146,8 @@ class VentanaEliminarCategoria:
         self.ventana.grab_set()
         self.centrar_ventana()
 
-        tk.Label(self.ventana, text="Eliminar Categoría", font=("Arial", 14, "bold"), bg="#FFFFFF", fg="#0055A5").pack(pady=20)
+        tk.Label(self.ventana, text="Eliminar Categoría", font=("Arial", 14, "bold"), bg="#FFFFFF", fg="#0055A5").pack(
+            pady=20)
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=20, pady=5)
         tk.Label(frame_form, text="Seleccione:", font=("Arial", 10, "bold"), bg="#FFFFFF").pack(side="left", padx=5)
@@ -902,8 +1157,10 @@ class VentanaEliminarCategoria:
         if categorias: self.combo_categorias.current(0)
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
-        tk.Button(frame_botones, text="Eliminar", font=("Arial", 10, "bold"), bg="#DC3545", fg="white", relief="flat",cursor="hand2", padx=20, pady=5, command=self.eliminar).pack(side="left", padx=10)
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 10, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=20, pady=5, command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Eliminar", font=("Arial", 10, "bold"), bg="#DC3545", fg="white", relief="flat",
+                  cursor="hand2", padx=20, pady=5, command=self.eliminar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 10, "bold"), bg="#6C757D", fg="white", relief="flat",
+                  cursor="hand2", padx=20, pady=5, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -934,7 +1191,8 @@ class VentanaAgregar:
         self.ventana.grab_set()
         self.centrar_ventana()
 
-        tk.Label(self.ventana, text="Agregar Nuevo Producto", font=("Arial", 16, "bold"), bg="#FFFFFF",fg="#0055A5").pack(pady=15)
+        tk.Label(self.ventana, text="Agregar Nuevo Producto", font=("Arial", 16, "bold"), bg="#FFFFFF",
+                 fg="#0055A5").pack(pady=15)
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=20, pady=5, fill="both", expand=True)
         frame_form.columnconfigure(1, weight=1)
@@ -943,7 +1201,8 @@ class VentanaAgregar:
         self.widgets = {}
 
         for i, label in enumerate(labels):
-            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="e",pady=5, padx=5)
+            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="e",
+                                                                                            pady=5, padx=5)
             if label == "Categoría:":
                 self.combo_categoria = ttk.Combobox(frame_form, values=CategoriasDB.obtener_todas(), state="readonly")
                 self.combo_categoria.grid(row=i, column=1, sticky="ew", pady=5, padx=5)
@@ -958,8 +1217,10 @@ class VentanaAgregar:
 
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
-        tk.Button(frame_botones, text="Guardar", font=("Arial", 11, "bold"), bg="#0055A5", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Guardar", font=("Arial", 11, "bold"), bg="#0055A5", fg="white", relief="flat",
+                  cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",
+                  cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -972,11 +1233,13 @@ class VentanaAgregar:
         vals = {k: v.get().strip() for k, v in self.widgets.items()}
         cat = self.combo_categoria.get()
         prov = self.combo_proveedor.get()
-        if not all([vals["Código:"], vals["Nombre:"], vals["Cantidad:"], vals["Precio Compra:"], vals["Precio Venta:"],prov]):
+        if not all([vals["Código:"], vals["Nombre:"], vals["Cantidad:"], vals["Precio Compra:"], vals["Precio Venta:"],
+                    prov]):
             messagebox.showerror("Error", "Todos los campos son obligatorios")
             return
         try:
-            if ProductosDB.agregar(vals["Nombre:"], vals["Código:"], float(vals["Precio Compra:"]),float(vals["Precio Venta:"]), cat, float(vals["Cantidad:"]), prov):
+            if ProductosDB.agregar(vals["Nombre:"], vals["Código:"], float(vals["Precio Compra:"]),
+                                   float(vals["Precio Venta:"]), cat, float(vals["Cantidad:"]), prov):
                 self.sistema.cargar_datos()
                 messagebox.showinfo("Éxito", "Producto agregado")
                 self.ventana.destroy()
@@ -998,7 +1261,8 @@ class VentanaEditar:
         self.ventana.grab_set()
         self.centrar_ventana()
 
-        tk.Label(self.ventana, text="Editar Producto", font=("Arial", 16, "bold"), bg="#FFFFFF", fg="#0055A5").pack(pady=15)
+        tk.Label(self.ventana, text="Editar Producto", font=("Arial", 16, "bold"), bg="#FFFFFF", fg="#0055A5").pack(
+            pady=15)
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=20, pady=5, fill="both", expand=True)
         frame_form.columnconfigure(1, weight=1)
@@ -1009,27 +1273,34 @@ class VentanaEditar:
                   ("Precio Venta:", item["precio_venta"])]
 
         for i, (label, val) in enumerate(campos):
-            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="e",pady=5, padx=5)
+            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="e",
+                                                                                            pady=5, padx=5)
             entry = tk.Entry(frame_form, font=("Arial", 10))
             entry.grid(row=i, column=1, sticky="ew", pady=5, padx=5)
             entry.insert(0, val)
             if label == "ID:": entry.config(state="disabled")
             self.widgets[label] = entry
 
-        tk.Label(frame_form, text="Categoría:", font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=6, column=0,sticky="e", pady=5,padx=5)
+        tk.Label(frame_form, text="Categoría:", font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=6, column=0,
+                                                                                               sticky="e", pady=5,
+                                                                                               padx=5)
         self.combo_categoria = ttk.Combobox(frame_form, values=CategoriasDB.obtener_todas())
         self.combo_categoria.grid(row=6, column=1, sticky="ew", pady=5, padx=5)
         self.combo_categoria.set(item["categoria"])
 
-        tk.Label(frame_form, text="Proveedor:", font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=7, column=0,sticky="e", pady=5,padx=5)
+        tk.Label(frame_form, text="Proveedor:", font=("Arial", 10, "bold"), bg="#FFFFFF").grid(row=7, column=0,
+                                                                                               sticky="e", pady=5,
+                                                                                               padx=5)
         self.combo_proveedor = ttk.Combobox(frame_form, values=ProveedoresDB.obtener_nombres())
         self.combo_proveedor.grid(row=7, column=1, sticky="ew", pady=5, padx=5)
         self.combo_proveedor.set(item["proveedor"])
 
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
-        tk.Button(frame_botones, text="Guardar Cambios", font=("Arial", 11, "bold"), bg="#0055A5", fg="white",relief="flat",cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Guardar Cambios", font=("Arial", 11, "bold"), bg="#0055A5", fg="white",
+                  relief="flat", cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",
+                  cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -1041,7 +1312,9 @@ class VentanaEditar:
     def guardar(self):
         vals = {k: v.get().strip() for k, v in self.widgets.items()}
         try:
-            if ProductosDB.actualizar(self.item_original["id_num"], vals["Nombre:"], vals["Código:"],float(vals["Precio Compra:"]), float(vals["Precio Venta:"]),self.combo_categoria.get(), float(vals["Cantidad:"]), self.combo_proveedor.get()):
+            if ProductosDB.actualizar(self.item_original["id_num"], vals["Nombre:"], vals["Código:"],
+                                      float(vals["Precio Compra:"]), float(vals["Precio Venta:"]),
+                                      self.combo_categoria.get(), float(vals["Cantidad:"]), self.combo_proveedor.get()):
                 self.sistema.cargar_datos()
                 messagebox.showinfo("Éxito", "Producto actualizado")
                 self.ventana.destroy()
@@ -1062,24 +1335,29 @@ class VentanaAgregarProveedor:
         self.ventana.grab_set()
         self.centrar_ventana()
 
-        tk.Label(self.ventana, text="Agregar Proveedor", font=("Arial", 18, "bold"), bg="#FFFFFF", fg="#0055A5").pack(pady=20)
+        tk.Label(self.ventana, text="Agregar Proveedor", font=("Arial", 18, "bold"), bg="#FFFFFF", fg="#0055A5").pack(
+            pady=20)
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=40, pady=10, fill="both", expand=True)
 
         self.widgets = {}
         for i, label in enumerate(["Nombre:", "Código:", "Teléfono:", "Encargado:"]):
-            tk.Label(frame_form, text=label, font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="w",pady=10)
+            tk.Label(frame_form, text=label, font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="w",
+                                                                                            pady=10)
             entry = tk.Entry(frame_form, font=("Arial", 11), width=30)
             entry.grid(row=i, column=1, pady=10, padx=10)
             self.widgets[label] = entry
 
-        tk.Label(frame_form, text="Información:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=4, column=0,sticky="nw", pady=10)
+        tk.Label(frame_form, text="Información:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=4, column=0,
+                                                                                                 sticky="nw", pady=10)
         self.text_info = tk.Text(frame_form, font=("Arial", 11), width=30, height=5)
         self.text_info.grid(row=4, column=1, pady=10, padx=10)
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
-        tk.Button(frame_botones, text="Guardar", font=("Arial", 11, "bold"), bg="#0055A5", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Guardar", font=("Arial", 11, "bold"), bg="#0055A5", fg="white", relief="flat",
+                  cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",
+                  cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -1093,7 +1371,8 @@ class VentanaAgregarProveedor:
         if not all([vals["Nombre:"], vals["Código:"], vals["Teléfono:"]]):
             messagebox.showerror("Error", "Campos obligatorios vacíos")
             return
-        if ProveedoresDB.agregar(vals["Nombre:"], vals["Código:"], vals["Teléfono:"], vals["Encargado:"],self.text_info.get("1.0", "end-1c").strip()):
+        if ProveedoresDB.agregar(vals["Nombre:"], vals["Código:"], vals["Teléfono:"], vals["Encargado:"],
+                                 self.text_info.get("1.0", "end-1c").strip()):
             self.sistema.cargar_proveedores()
             messagebox.showinfo("Éxito", "Proveedor agregado")
             self.ventana.destroy()
@@ -1113,30 +1392,36 @@ class VentanaEditarProveedor:
         self.ventana.grab_set()
         self.centrar_ventana()
 
-        tk.Label(self.ventana, text="Editar Proveedor", font=("Arial", 18, "bold"), bg="#FFFFFF", fg="#0055A5").pack(pady=20)
+        tk.Label(self.ventana, text="Editar Proveedor", font=("Arial", 18, "bold"), bg="#FFFFFF", fg="#0055A5").pack(
+            pady=20)
         frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_form.pack(padx=40, pady=10, fill="both", expand=True)
 
         self.widgets = {}
-        campos = [("Nombre:", proveedor["nombre"]), ("Código:", proveedor["codigo"]),("Teléfono:", proveedor["telefono"]), ("Encargado:", proveedor["encargado"])]
+        campos = [("Nombre:", proveedor["nombre"]), ("Código:", proveedor["codigo"]),
+                  ("Teléfono:", proveedor["telefono"]), ("Encargado:", proveedor["encargado"])]
 
         for i, (label, val) in enumerate(campos):
-            tk.Label(frame_form, text=label, font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="w",pady=10)
+            tk.Label(frame_form, text=label, font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="w",
+                                                                                            pady=10)
             entry = tk.Entry(frame_form, font=("Arial", 11), width=30)
             entry.grid(row=i, column=1, pady=10, padx=10)
             entry.insert(0, val)
             if label == "Código:": entry.config(state="readonly")
             self.widgets[label] = entry
 
-        tk.Label(frame_form, text="Información:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=4, column=0, sticky="nw", pady=10)
+        tk.Label(frame_form, text="Información:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=4, column=0,
+                                                                                                 sticky="nw", pady=10)
         self.text_info = tk.Text(frame_form, font=("Arial", 11), width=30, height=5)
         self.text_info.grid(row=4, column=1, pady=10, padx=10)
         self.text_info.insert("1.0", proveedor["informacion"])
 
         frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
         frame_botones.pack(pady=20)
-        tk.Button(frame_botones, text="Guardar Cambios", font=("Arial", 11, "bold"), bg="#0055A5", fg="white",relief="flat", cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
-        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Guardar Cambios", font=("Arial", 11, "bold"), bg="#0055A5", fg="white",
+                  relief="flat", cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white", relief="flat",
+                  cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
 
     def centrar_ventana(self):
         self.ventana.update_idletasks()
@@ -1150,7 +1435,9 @@ class VentanaEditarProveedor:
         if not all([vals["Nombre:"], vals["Teléfono:"]]):
             messagebox.showerror("Error", "Nombre y teléfono obligatorios")
             return
-        if ProveedoresDB.actualizar(self.proveedor_original["id_num"], vals["Nombre:"],self.proveedor_original["codigo"],vals["Teléfono:"], vals["Encargado:"], self.text_info.get("1.0", "end-1c").strip()):
+        if ProveedoresDB.actualizar(self.proveedor_original["id_num"], vals["Nombre:"],
+                                    self.proveedor_original["codigo"], vals["Teléfono:"], vals["Encargado:"],
+                                    self.text_info.get("1.0", "end-1c").strip()):
             self.sistema.cargar_proveedores()
             messagebox.showinfo("Éxito", "Proveedor actualizado")
             self.ventana.destroy()
