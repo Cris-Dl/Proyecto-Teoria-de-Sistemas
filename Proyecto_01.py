@@ -59,9 +59,16 @@ class TablasDB:
                 cv_path TEXT,
                 puesto TEXT,
                 usuario TEXT,
-                contrasena TEXT
+                contrasena TEXT,
+                sueldo_base REAL
             );
         """)
+
+        # Intentar añadir la columna sueldo_base si la tabla ya existía antes de esta actualización
+        try:
+            conn.execute("ALTER TABLE colaboradores ADD COLUMN sueldo_base REAL")
+        except sqlite3.OperationalError:
+            pass
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS ventas (
@@ -266,9 +273,9 @@ class ColaboradoresDB:
         try:
             conn.execute(
                 """INSERT INTO colaboradores
-                   (codigo, nombre, apellidos, dpi, edad, direccion, telefono, cv_path, puesto, usuario, contrasena)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                ("", nombre, apellidos, dpi, edad, direccion, telefono, cv_path, "", "", "")
+                   (codigo, nombre, apellidos, dpi, edad, direccion, telefono, cv_path, puesto, usuario, contrasena, sueldo_base)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("", nombre, apellidos, dpi, edad, direccion, telefono, cv_path, "", "", "", 0.0)
             )
             conn.commit()
             return True
@@ -281,7 +288,7 @@ class ColaboradoresDB:
     @staticmethod
     def _fila_a_dict(row):
         keys = ["id", "codigo", "nombre", "apellidos", "dpi", "edad",
-                "direccion", "telefono", "cv_path", "puesto", "usuario", "contrasena"]
+                "direccion", "telefono", "cv_path", "puesto", "usuario", "contrasena", "sueldo_base"]
         d = {}
         for k in keys:
             try:
@@ -325,7 +332,6 @@ class ColaboradoresDB:
     def obtener_siguiente_secuencia(puesto):
         conn = TablasDB._conn()
         try:
-            # Consultamos los códigos actuales para el puesto dado
             cur = conn.execute("SELECT codigo FROM colaboradores WHERE puesto=?", (puesto,))
             max_sec = 0
             for row in cur:
@@ -344,10 +350,11 @@ class ColaboradoresDB:
             conn.close()
 
     @staticmethod
-    def asignar_puesto_codigo(id_col, puesto, codigo):
+    def asignar_puesto_codigo(id_col, puesto, codigo, sueldo_base):
         conn = TablasDB._conn()
         try:
-            conn.execute("UPDATE colaboradores SET puesto=?, codigo=? WHERE id=?", (puesto, codigo, id_col))
+            conn.execute("UPDATE colaboradores SET puesto=?, codigo=?, sueldo_base=? WHERE id=?",
+                         (puesto, codigo, sueldo_base, id_col))
             conn.commit()
             return True
         except Exception as e:
@@ -400,11 +407,10 @@ class PuestosDB:
                 abreviatura TEXT
             )
         """)
-        # Intentar añadir la columna en caso de que la tabla ya exista de versiones anteriores
         try:
             conn.execute("ALTER TABLE puestos ADD COLUMN abreviatura TEXT")
         except sqlite3.OperationalError:
-            pass  # La columna ya existe
+            pass
 
         conn.commit()
         conn.close()
@@ -428,7 +434,6 @@ class PuestosDB:
         conn = TablasDB._conn()
         try:
             cur = conn.execute("SELECT nombre, abreviatura FROM puestos ORDER BY nombre")
-            # Devolvemos un diccionario para poder usar la info fácilmente
             return [{"nombre": r["nombre"], "abreviatura": r["abreviatura"]} for r in cur]
         finally:
             conn.close()
@@ -853,7 +858,6 @@ class SistemaGEOS:
 
         self.tabla_prod_venta.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Se agrega identificar la fila para evitar clics vacíos
         self.tabla_prod_venta.bind("<Double-1>", self.agregar_al_carrito)
 
         self.cargar_productos_venta()
@@ -929,7 +933,6 @@ class SistemaGEOS:
 
     def agregar_al_carrito(self, event=None):
         if event and not hasattr(self, 'tabla_prod_venta'): return
-        # Validar que no se hizo click en espacio en blanco
         if event and not self.tabla_prod_venta.identify_row(event.y): return
 
         seleccion = self.tabla_prod_venta.selection()
@@ -1412,6 +1415,7 @@ class SistemaGEOS:
         frame_form.pack(padx=60, pady=5, fill="x")
         frame_form.columnconfigure(1, weight=1)
 
+        # Volvemos a quitar Sueldo Base de aquí
         campos_labels = ["Nombre:", "Apellidos:", "DPI:", "Edad:", "Dirección:", "Teléfono:"]
         self._rrhh_entries = {}
         for i, label in enumerate(campos_labels):
@@ -1462,7 +1466,9 @@ class SistemaGEOS:
         if not vals["Nombre:"]:
             messagebox.showerror("Error", "El nombre es obligatorio.")
             return
+
         cv_path = self._rrhh_cv_path.get()
+        # Se elimina el sueldo base de la insercion inicial
         if ColaboradoresDB.agregar(vals["Nombre:"], vals["Apellidos:"], vals["DPI:"],
                                    vals["Edad:"], vals["Dirección:"], vals["Teléfono:"], cv_path):
             self._rrhh_limpiar_contratacion()
@@ -1546,7 +1552,6 @@ class SistemaGEOS:
         self._entry_puesto = tk.Entry(frame_inp, font=("Arial", 11), width=30)
         self._entry_puesto.grid(row=0, column=1, padx=10, pady=8)
 
-        # Novedad: Agregamos Abreviatura
         tk.Label(frame_inp, text="Abreviatura:", font=("Arial", 11, "bold"),
                  bg=self.COLOR_FONDO).grid(row=1, column=0, sticky="e", padx=10, pady=8)
         self._entry_abrev = tk.Entry(frame_inp, font=("Arial", 11), width=30)
@@ -1569,7 +1574,6 @@ class SistemaGEOS:
             return
         self._lista_puestos.delete(0, "end")
         for p in PuestosDB.obtener_todos():
-            # Formateamos para que muestre: Nombre (ABREV)
             abrev = p["abreviatura"] if p["abreviatura"] else ""
             mostrar = f"{p['nombre']} ({abrev})" if abrev else p['nombre']
             self._lista_puestos.insert("end", mostrar)
@@ -1622,10 +1626,8 @@ class SistemaGEOS:
         self._tabla_asignar.column("ID", width=0, stretch=False)
         self._tabla_asignar.pack(fill="both", expand=True)
 
-        # Se cambia de <ButtonRelease-1> a doble click <Double-1>
         self._tabla_asignar.bind("<Double-1>", self._click_asignar)
 
-        # Cargar datos por defecto y mostrarlos en la tabla inmediatamente
         self._datos_asignar = ColaboradoresDB.obtener_sin_puesto()
         self._filtrar_asignar()
 
@@ -1653,7 +1655,6 @@ class SistemaGEOS:
             return
         vals = self._tabla_asignar.item(sel[0])["values"]
         col_id = vals[0]
-        # Find full data
         col_data = next((c for c in self._datos_asignar if str(c["id"]) == str(col_id)), None)
         if not col_data:
             return
@@ -1666,7 +1667,7 @@ class SistemaGEOS:
         vent.transient(self.root)
         vent.grab_set()
         vent.update_idletasks()
-        w, h = 480, 520
+        w, h = 480, 560
         x = (vent.winfo_screenwidth() // 2) - (w // 2)
         y = (vent.winfo_screenheight() // 2) - (h // 2)
         vent.geometry(f"{w}x{h}+{x}+{y}")
@@ -1677,13 +1678,14 @@ class SistemaGEOS:
         frame_datos = tk.Frame(vent, bg="#FFFFFF")
         frame_datos.pack(padx=30, pady=5, fill="x")
 
+        # Al momento de asignar, mostramos solo los datos y pediremos el sueldo más abajo
         datos_mostrar = [
             ("Nombre:", col_data["nombre"]),
             ("Apellidos:", col_data["apellidos"]),
             ("DPI:", col_data["dpi"]),
             ("Edad:", col_data["edad"]),
             ("Dirección:", col_data["direccion"]),
-            ("Teléfono:", col_data["telefono"]),
+            ("Teléfono:", col_data["telefono"])
         ]
         for i, (lbl, val) in enumerate(datos_mostrar):
             tk.Label(frame_datos, text=lbl, font=("Arial", 10, "bold"),
@@ -1700,7 +1702,6 @@ class SistemaGEOS:
         tk.Label(frame_asig, text="Seleccionar Puesto:", font=("Arial", 10, "bold"),
                  bg="#FFFFFF", anchor="e", width=18).grid(row=0, column=0, sticky="e", pady=8, padx=5)
 
-        # Adaptamos el listado para extraer solo el 'nombre' del diccionario que ahora devuelve PuestosDB
         todos_los_puestos = PuestosDB.obtener_todos()
         puestos_lista = [p["nombre"] for p in todos_los_puestos]
 
@@ -1712,32 +1713,30 @@ class SistemaGEOS:
         entry_codigo = tk.Entry(frame_asig, font=("Arial", 10), width=24)
         entry_codigo.grid(row=1, column=1, sticky="ew", pady=8, padx=5)
 
-        # ---- FUNCIÓN PARA GENERAR CÓDIGO AUTOMÁTICO ----
+        # Novedad: Agregamos el campo Sueldo Base a la hora de asignar puesto
+        tk.Label(frame_asig, text="Sueldo Base (Q):", font=("Arial", 10, "bold"),
+                 bg="#FFFFFF", anchor="e", width=18).grid(row=2, column=0, sticky="e", pady=8, padx=5)
+        entry_sueldo = tk.Entry(frame_asig, font=("Arial", 10), width=24)
+        entry_sueldo.grid(row=2, column=1, sticky="ew", pady=8, padx=5)
+
         def autocompletar_codigo(event=None):
             puesto_seleccionado = combo_puesto.get().strip()
             if not puesto_seleccionado:
                 return
 
-            # Buscar abreviatura del puesto seleccionado
             abreviatura = ""
             for p in todos_los_puestos:
                 if p["nombre"] == puesto_seleccionado:
                     abreviatura = p["abreviatura"] if p["abreviatura"] else puesto_seleccionado[:3].upper()
                     break
 
-            # Obtener el primer nombre (en mayúsculas)
             primer_nombre = col_data["nombre"].strip().split()[0].upper()
-
-            # Obtener el correlativo secuencial
             siguiente_num = ColaboradoresDB.obtener_siguiente_secuencia(puesto_seleccionado)
-
-            # Generar el código con el formato solicitado (Ej. JUAN-VEN001)
             nuevo_codigo = f"{primer_nombre}-{abreviatura.upper()}{siguiente_num:03d}"
 
             entry_codigo.delete(0, tk.END)
             entry_codigo.insert(0, nuevo_codigo)
 
-        # Enlazamos el evento al combobox
         combo_puesto.bind("<<ComboboxSelected>>", autocompletar_codigo)
 
         frame_btns = tk.Frame(vent, bg="#FFFFFF")
@@ -1746,10 +1745,23 @@ class SistemaGEOS:
         def contratar():
             puesto = combo_puesto.get().strip()
             codigo = entry_codigo.get().strip()
+            sueldo_str = entry_sueldo.get().strip()
+
             if not puesto or not codigo:
                 messagebox.showerror("Error", "Debe seleccionar un puesto y asignar un código.", parent=vent)
                 return
-            if ColaboradoresDB.asignar_puesto_codigo(col_data["id"], puesto, codigo):
+
+            if not sueldo_str:
+                messagebox.showerror("Error", "Debe ingresar el sueldo base del empleado.", parent=vent)
+                return
+
+            try:
+                sueldo_base = float(sueldo_str)
+            except ValueError:
+                messagebox.showerror("Error", "El sueldo base debe ser un número válido.", parent=vent)
+                return
+
+            if ColaboradoresDB.asignar_puesto_codigo(col_data["id"], puesto, codigo, sueldo_base):
                 nombre_completo = f"{col_data['nombre']} {col_data['apellidos']}"
                 messagebox.showinfo("Éxito", f"{nombre_completo} contratado correctamente", parent=vent)
                 self._datos_asignar = ColaboradoresDB.obtener_sin_puesto()
@@ -1766,7 +1778,6 @@ class SistemaGEOS:
                   command=vent.destroy).pack(side="left", padx=10)
 
     def _rrhh_generar_credenciales(self):
-        import random
         self._rrhh_limpiar_der()
         tk.Label(self.frame_rrhh_der, text="Generar Credenciales para Empleado",
                  font=("Arial", 14, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(15, 5))
@@ -1798,10 +1809,8 @@ class SistemaGEOS:
         self._tabla_cred.column("ID", width=0, stretch=False)
         self._tabla_cred.pack(fill="both", expand=True)
 
-        # Se cambia a doble click
         self._tabla_cred.bind("<Double-1>", self._click_generar_credencial)
 
-        # Cargar y mostrar datos al inicio
         self._datos_cred = ColaboradoresDB.obtener_con_puesto()
         self._filtrar_credenciales()
 
@@ -1821,7 +1830,6 @@ class SistemaGEOS:
                 ))
 
     def _click_generar_credencial(self, event=None):
-        import random
         if not hasattr(self, '_tabla_cred'): return
         if event and not self._tabla_cred.identify_row(event.y): return
 
@@ -1836,21 +1844,16 @@ class SistemaGEOS:
 
         if col_data["usuario"]:
             messagebox.showinfo("Credenciales ya generadas",
-                                f"Este empleado ya tiene usuario: {col_data['usuario']}")
+                                f"Credenciales actuales del empleado:\n\n"
+                                f"Usuario: {col_data['usuario']}\n"
+                                f"Contraseña: {col_data['contrasena']}")
             return
 
-        nombre = col_data["nombre"].lower().replace(" ", "")
-        apellido = col_data["apellidos"].lower().replace(" ", "")
-        base = (nombre[:3] + apellido[:3]).ljust(6, "x")
+        usuario = col_data["codigo"]
 
-        # Generate unique user
-        intentos = 0
-        while intentos < 100:
-            nums = "".join(str(random.randint(0, 9)) for _ in range(3))
-            usuario = base + nums
-            if not ColaboradoresDB.usuario_existe(usuario):
-                break
-            intentos += 1
+        if not usuario:
+            messagebox.showerror("Error", "Este empleado no tiene un código asignado.")
+            return
 
         contrasena = usuario[::-1]
 
@@ -1859,11 +1862,10 @@ class SistemaGEOS:
             self._filtrar_credenciales()
             messagebox.showinfo("Credenciales generadas",
                                 f"Usuario: {usuario}\nContraseña: {contrasena}\n\n"
-                                f"(Contraseña = usuario al revés)")
+                                f"(Contraseña = código al revés)")
         else:
             messagebox.showerror("Error", "No se pudieron guardar las credenciales.")
 
-    # ── Eliminar colaborador ─────────────────────────────────────────
     def _rrhh_eliminar_colaborador(self):
         self._rrhh_limpiar_der()
         tk.Label(self.frame_rrhh_der, text="Eliminar Colaborador",
