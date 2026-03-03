@@ -47,6 +47,23 @@ class TablasDB:
         """)
 
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS colaboradores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo TEXT,
+                nombre TEXT NOT NULL,
+                apellidos TEXT,
+                dpi TEXT,
+                edad TEXT,
+                direccion TEXT,
+                telefono TEXT,
+                cv_path TEXT,
+                puesto TEXT,
+                usuario TEXT,
+                contrasena TEXT
+            );
+        """)
+
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS ventas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 fecha TEXT,
@@ -237,6 +254,151 @@ class ProveedoresDB:
             )
             conn.commit()
             return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+
+class ColaboradoresDB:
+    @staticmethod
+    def agregar(nombre, apellidos, dpi, edad, direccion, telefono, cv_path=""):
+        conn = TablasDB._conn()
+        try:
+            conn.execute(
+                """INSERT INTO colaboradores
+                   (codigo, nombre, apellidos, dpi, edad, direccion, telefono, cv_path, puesto, usuario, contrasena)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("", nombre, apellidos, dpi, edad, direccion, telefono, cv_path, "", "", "")
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _fila_a_dict(row):
+        keys = ["id", "codigo", "nombre", "apellidos", "dpi", "edad",
+                "direccion", "telefono", "cv_path", "puesto", "usuario", "contrasena"]
+        d = {}
+        for k in keys:
+            try:
+                d[k] = row[k] or ""
+            except Exception:
+                d[k] = ""
+        return d
+
+    @staticmethod
+    def obtener_todos():
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("SELECT * FROM colaboradores ORDER BY nombre")
+            return [ColaboradoresDB._fila_a_dict(r) for r in cursor]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def obtener_sin_puesto():
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute(
+                "SELECT * FROM colaboradores WHERE (puesto IS NULL OR puesto='') AND (codigo IS NULL OR codigo='') ORDER BY nombre"
+            )
+            return [ColaboradoresDB._fila_a_dict(r) for r in cursor]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def obtener_con_puesto():
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute(
+                "SELECT * FROM colaboradores WHERE puesto!='' AND codigo!='' ORDER BY nombre"
+            )
+            return [ColaboradoresDB._fila_a_dict(r) for r in cursor]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def asignar_puesto_codigo(id_col, puesto, codigo):
+        conn = TablasDB._conn()
+        try:
+            conn.execute("UPDATE colaboradores SET puesto=?, codigo=? WHERE id=?", (puesto, codigo, id_col))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def asignar_credenciales(id_col, usuario, contrasena):
+        conn = TablasDB._conn()
+        try:
+            conn.execute("UPDATE colaboradores SET usuario=?, contrasena=? WHERE id=?", (usuario, contrasena, id_col))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def usuario_existe(usuario):
+        conn = TablasDB._conn()
+        try:
+            cur = conn.execute("SELECT COUNT(*) FROM colaboradores WHERE usuario=?", (usuario,))
+            return cur.fetchone()[0] > 0
+        finally:
+            conn.close()
+
+    @staticmethod
+    def eliminar(id_num):
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("DELETE FROM colaboradores WHERE id = ?", (id_num,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+
+class PuestosDB:
+    @staticmethod
+    def crear_tabla():
+        conn = TablasDB._conn()
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS puestos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT UNIQUE NOT NULL
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def agregar(nombre):
+        PuestosDB.crear_tabla()
+        conn = TablasDB._conn()
+        try:
+            conn.execute("INSERT INTO puestos (nombre) VALUES (?)", (nombre,))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def obtener_todos():
+        PuestosDB.crear_tabla()
+        conn = TablasDB._conn()
+        try:
+            cur = conn.execute("SELECT nombre FROM puestos ORDER BY nombre")
+            return [r["nombre"] for r in cur]
         finally:
             conn.close()
 
@@ -581,7 +743,7 @@ class SistemaGEOS:
         frame_pestanas = tk.Frame(frame_nav, bg=self.COLOR_AZUL)
         frame_pestanas.place(relx=0.5, rely=0.5, anchor="center")
 
-        pestanas = ["Inventario", "Ventas", "Proveedores", "Clientes", "Reportes"]
+        pestanas = ["Inventario", "Ventas", "Proveedores", "Clientes", "Reportes", "RRHH"]
         self.botones_pestanas = {}
 
         for i, pestana in enumerate(pestanas):
@@ -610,6 +772,8 @@ class SistemaGEOS:
             self.mostrar_ventas()
         elif pestana == "Proveedores":
             self.mostrar_proveedores()
+        elif pestana == "RRHH":
+            self.mostrar_rrhh()
         else:
             for widget in self.frame_contenido.winfo_children(): widget.destroy()
             tk.Label(self.frame_contenido, text=f"Sección {pestana} en construcción", font=("Arial", 14),
@@ -1090,6 +1254,534 @@ class SistemaGEOS:
             self.cargar_proveedores()
             messagebox.showinfo("Éxito", "Proveedor eliminado correctamente")
 
+
+    def mostrar_rrhh(self):
+        for widget in self.frame_contenido.winfo_children():
+            widget.destroy()
+
+        paned = tk.PanedWindow(self.frame_contenido, orient="horizontal", bg="#DDDDDD", sashwidth=4)
+        paned.pack(fill="both", expand=True)
+
+        frame_izq = tk.Frame(paned, bg=self.COLOR_FONDO, width=210)
+        paned.add(frame_izq, minsize=180)
+
+        tk.Label(frame_izq, text="RRHH", font=("Arial", 13, "bold"), bg=self.COLOR_FONDO,
+                 fg=self.COLOR_AZUL).pack(pady=(15, 10), padx=10)
+
+        btn_style = dict(font=("Arial", 9, "bold"), bg=self.COLOR_AZUL, fg="white",
+                         relief="flat", cursor="hand2", padx=8, pady=7, anchor="w")
+
+        botones_rrhh = [
+            ("Ingresar Postulante",              self._rrhh_contratar),
+            ("Ver colaboradores por contratar",  self._rrhh_ver_postulantes),
+            ("Generar Puesto",                   self._rrhh_generar_puesto),
+            ("Asignar puesto a colaborador",     self._rrhh_asignar_puesto),
+            ("Generar credenciales para empleado", self._rrhh_generar_credenciales),
+            ("Nómina",                           self._rrhh_proximamente),
+            ("Eliminar colaborador",             self._rrhh_eliminar_colaborador),
+        ]
+
+        for texto, cmd in botones_rrhh:
+            tk.Button(frame_izq, text=texto, **btn_style,
+                      command=lambda c=cmd: c()).pack(fill="x", padx=10, pady=3)
+
+        self.frame_rrhh_der = tk.Frame(paned, bg=self.COLOR_FONDO)
+        paned.add(self.frame_rrhh_der, minsize=400)
+
+        self._rrhh_mostrar_bienvenida()
+
+    def _rrhh_limpiar_der(self):
+        for widget in self.frame_rrhh_der.winfo_children():
+            widget.destroy()
+
+    def _rrhh_mostrar_bienvenida(self):
+        self._rrhh_limpiar_der()
+
+        frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA",
+                             highlightbackground="#CCCCCC", highlightthickness=1)
+        frame_img.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.9)
+        tk.Label(frame_img, text="[ Imagen RRHH ]", font=("Arial", 18), bg="#F0F4FA",
+                 fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+
+    def _rrhh_proximamente(self):
+        self._rrhh_limpiar_der()
+        tk.Label(self.frame_rrhh_der, text="Funcionalidad próximamente disponible",
+                 font=("Arial", 13), bg=self.COLOR_FONDO, fg="#888888").pack(pady=80)
+
+    def _rrhh_contratar(self):
+        self._rrhh_limpiar_der()
+
+        canvas_scroll = tk.Canvas(self.frame_rrhh_der, bg=self.COLOR_FONDO, highlightthickness=0)
+        sb = ttk.Scrollbar(self.frame_rrhh_der, orient="vertical", command=canvas_scroll.yview)
+        canvas_scroll.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        canvas_scroll.pack(side="left", fill="both", expand=True)
+
+        inner = tk.Frame(canvas_scroll, bg=self.COLOR_FONDO)
+        win_id = canvas_scroll.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_resize(e):
+            canvas_scroll.itemconfig(win_id, width=e.width)
+        canvas_scroll.bind("<Configure>", _on_resize)
+        inner.bind("<Configure>", lambda e: canvas_scroll.configure(scrollregion=canvas_scroll.bbox("all")))
+
+        tk.Label(inner, text="Ingresar Postulante", font=("Arial", 15, "bold"),
+                 bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(20, 10))
+
+        frame_form = tk.Frame(inner, bg=self.COLOR_FONDO)
+        frame_form.pack(padx=60, pady=5, fill="x")
+        frame_form.columnconfigure(1, weight=1)
+
+        campos_labels = ["Nombre:", "Apellidos:", "DPI:", "Edad:", "Dirección:", "Teléfono:"]
+        self._rrhh_entries = {}
+        for i, label in enumerate(campos_labels):
+            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"),
+                     bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=i, column=0, sticky="e", pady=7, padx=5)
+            entry = tk.Entry(frame_form, font=("Arial", 10), width=35)
+            entry.grid(row=i, column=1, sticky="ew", pady=7, padx=5)
+            self._rrhh_entries[label] = entry
+
+        tk.Label(frame_form, text="Importar CV:", font=("Arial", 10, "bold"),
+                 bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=6, column=0, sticky="e", pady=7, padx=5)
+        frame_cv = tk.Frame(frame_form, bg=self.COLOR_FONDO)
+        frame_cv.grid(row=6, column=1, sticky="ew", pady=7, padx=5)
+        self._rrhh_cv_path = tk.StringVar(value="")
+        self._lbl_cv = tk.Label(frame_cv, text="Ningún archivo seleccionado",
+                                font=("Arial", 9), bg=self.COLOR_FONDO, fg="#666666")
+        self._lbl_cv.pack(side="left", padx=(0, 10))
+        tk.Button(frame_cv, text="Seleccionar PDF", font=("Arial", 9, "bold"),
+                  bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,
+                  cursor="hand2", padx=8, pady=3,
+                  command=self._rrhh_seleccionar_cv).pack(side="left")
+
+        frame_btns = tk.Frame(inner, bg=self.COLOR_FONDO)
+        frame_btns.pack(pady=20)
+        tk.Button(frame_btns, text="Confirmar", font=("Arial", 11, "bold"),
+                  bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,
+                  command=self._rrhh_confirmar_contratacion).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),
+                  bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,
+                  command=self._rrhh_limpiar_contratacion).pack(side="left", padx=10)
+
+    def _rrhh_seleccionar_cv(self):
+        from tkinter import filedialog
+        ruta = filedialog.askopenfilename(
+            title="Seleccionar CV (PDF, máx. 5 MB)",
+            filetypes=[("Archivos PDF", "*.pdf")]
+        )
+        if not ruta:
+            return
+        if os.path.getsize(ruta) > 5 * 1024 * 1024:
+            messagebox.showerror("Archivo muy grande", "El PDF no debe superar 5 MB.")
+            return
+        self._rrhh_cv_path.set(ruta)
+        nombre_corto = os.path.basename(ruta)
+        if len(nombre_corto) > 40:
+            nombre_corto = nombre_corto[:37] + "..."
+        self._lbl_cv.config(text=nombre_corto, fg="#333333")
+
+    def _rrhh_limpiar_contratacion(self):
+        for entry in self._rrhh_entries.values():
+            entry.delete(0, "end")
+        self._rrhh_cv_path.set("")
+        if hasattr(self, "_lbl_cv"):
+            self._lbl_cv.config(text="Ningún archivo seleccionado", fg="#666666")
+
+    def _rrhh_confirmar_contratacion(self):
+        vals = {k: v.get().strip() for k, v in self._rrhh_entries.items()}
+        if not vals["Nombre:"]:
+            messagebox.showerror("Error", "El nombre es obligatorio.")
+            return
+        cv_path = self._rrhh_cv_path.get()
+        if ColaboradoresDB.agregar(vals["Nombre:"], vals["Apellidos:"], vals["DPI:"],
+                                   vals["Edad:"], vals["Dirección:"], vals["Teléfono:"], cv_path):
+            self._rrhh_limpiar_contratacion()
+            messagebox.showinfo("Éxito", "Empleado registrado con éxito")
+        else:
+            messagebox.showerror("Error", "No se pudo registrar el empleado.")
+
+    def _rrhh_ver_postulantes(self):
+        self._rrhh_limpiar_der()
+        tk.Label(self.frame_rrhh_der, text="Colaboradores por Contratar",
+                 font=("Arial", 14, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(15, 5))
+        tk.Label(self.frame_rrhh_der,
+                 text="Postulantes sin puesto ni código asignado. Haga doble clic para ver el CV.",
+                 font=("Arial", 9, "italic"), bg=self.COLOR_FONDO, fg="#666666").pack()
+
+        frame_tabla = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        frame_tabla.pack(fill="both", expand=True, padx=10, pady=5)
+        sb = ttk.Scrollbar(frame_tabla)
+        sb.pack(side="right", fill="y")
+
+        cols = ("ID", "Nombre", "Apellidos", "DPI", "Edad", "Dirección", "Teléfono", "CV")
+        self._tabla_postulantes = ttk.Treeview(frame_tabla, columns=cols, show="headings",
+                                               yscrollcommand=sb.set, height=18)
+        sb.config(command=self._tabla_postulantes.yview)
+        anchos = [40, 150, 150, 110, 50, 180, 100, 200]
+        for col, w in zip(cols, anchos):
+            self._tabla_postulantes.heading(col, text=col)
+            self._tabla_postulantes.column(col, width=w)
+        self._tabla_postulantes.column("ID", width=0, stretch=False)  # hide ID
+        self._tabla_postulantes.pack(fill="both", expand=True)
+        self._tabla_postulantes.bind("<Double-1>", self._rrhh_ver_cv_postulante)
+        self._cargar_postulantes()
+
+    def _cargar_postulantes(self):
+        if not hasattr(self, '_tabla_postulantes'):
+            return
+        for item in self._tabla_postulantes.get_children():
+            self._tabla_postulantes.delete(item)
+        for col in ColaboradoresDB.obtener_sin_puesto():
+            self._tabla_postulantes.insert("", "end", values=(
+                col["id"], col["nombre"], col["apellidos"], col["dpi"],
+                col["edad"], col["direccion"], col["telefono"], col["cv_path"]
+            ))
+
+    def _rrhh_ver_cv_postulante(self, event=None):
+        if not hasattr(self, '_tabla_postulantes'):
+            return
+        sel = self._tabla_postulantes.selection()
+        if not sel:
+            return
+        vals = self._tabla_postulantes.item(sel[0])["values"]
+        cv_path = vals[7] if len(vals) > 7 else ""
+        if not cv_path or not os.path.exists(str(cv_path)):
+            messagebox.showinfo("Sin CV", "Este postulante no tiene CV adjunto o el archivo no existe.")
+            return
+        import subprocess, sys
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(cv_path)
+            elif sys.platform == "darwin":
+                subprocess.call(["open", cv_path])
+            else:
+                subprocess.call(["xdg-open", cv_path])
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el PDF:\n{e}")
+
+    def _rrhh_generar_puesto(self):
+        self._rrhh_limpiar_der()
+        outer = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        outer.place(relx=0.5, rely=0.5, anchor="center")
+
+        tk.Label(outer, text="Generar Puesto", font=("Arial", 16, "bold"),
+                 bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(0, 20))
+
+        frame_inp = tk.Frame(outer, bg=self.COLOR_FONDO)
+        frame_inp.pack()
+        tk.Label(frame_inp, text="Nombre del puesto:", font=("Arial", 11, "bold"),
+                 bg=self.COLOR_FONDO).grid(row=0, column=0, sticky="e", padx=10, pady=8)
+        self._entry_puesto = tk.Entry(frame_inp, font=("Arial", 11), width=30)
+        self._entry_puesto.grid(row=0, column=1, padx=10, pady=8)
+
+        tk.Button(outer, text="Guardar Puesto", font=("Arial", 11, "bold"),
+                  bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
+                  command=self._rrhh_guardar_puesto).pack(pady=15)
+
+        # List of existing posts
+        tk.Label(outer, text="Puestos creados:", font=("Arial", 10, "bold"),
+                 bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(10, 2))
+        self._lista_puestos = tk.Listbox(outer, font=("Arial", 10), width=40, height=8,
+                                         selectbackground=self.COLOR_AZUL)
+        self._lista_puestos.pack(pady=5)
+        self._actualizar_lista_puestos()
+
+    def _actualizar_lista_puestos(self):
+        if not hasattr(self, '_lista_puestos'):
+            return
+        self._lista_puestos.delete(0, "end")
+        for p in PuestosDB.obtener_todos():
+            self._lista_puestos.insert("end", p)
+
+    def _rrhh_guardar_puesto(self):
+        nombre = self._entry_puesto.get().strip()
+        if not nombre:
+            messagebox.showerror("Error", "Ingrese un nombre para el puesto.")
+            return
+        if PuestosDB.agregar(nombre):
+            self._entry_puesto.delete(0, "end")
+            self._actualizar_lista_puestos()
+            messagebox.showinfo("Éxito", f"Puesto '{nombre}' creado correctamente.")
+        else:
+            messagebox.showerror("Error", "El puesto ya existe.")
+
+
+    def _rrhh_asignar_puesto(self):
+        self._rrhh_limpiar_der()
+        tk.Label(self.frame_rrhh_der, text="Asignar Puesto a Colaborador",
+                 font=("Arial", 14, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(15, 5))
+
+        frame_busq = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        frame_busq.pack(fill="x", padx=15, pady=5)
+        tk.Label(frame_busq, text="Buscar aspirante por nombre o DPI:", font=("Arial", 10, "bold"),
+                 bg=self.COLOR_FONDO).pack(side="left", padx=5)
+        self._entry_busq_asignar = tk.Entry(frame_busq, font=("Arial", 10), width=30)
+        self._entry_busq_asignar.pack(side="left", padx=5)
+        self._entry_busq_asignar.bind("<KeyRelease>", self._filtrar_asignar)
+
+        frame_tabla = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        frame_tabla.pack(fill="both", expand=True, padx=10, pady=5)
+        sb = ttk.Scrollbar(frame_tabla)
+        sb.pack(side="right", fill="y")
+
+        cols = ("ID", "Nombre", "Apellidos", "DPI", "Edad", "Dirección", "Teléfono")
+        self._tabla_asignar = ttk.Treeview(frame_tabla, columns=cols, show="headings",
+                                           yscrollcommand=sb.set, height=15)
+        sb.config(command=self._tabla_asignar.yview)
+        anchos = [0, 160, 160, 120, 55, 180, 110]
+        for col, w in zip(cols, anchos):
+            self._tabla_asignar.heading(col, text=col)
+            self._tabla_asignar.column(col, width=w)
+        self._tabla_asignar.column("ID", width=0, stretch=False)
+        self._tabla_asignar.pack(fill="both", expand=True)
+        self._tabla_asignar.bind("<ButtonRelease-1>", self._click_asignar)
+        # Load empty by default
+        self._datos_asignar = ColaboradoresDB.obtener_sin_puesto()
+
+    def _filtrar_asignar(self, event=None):
+        if not hasattr(self, '_tabla_asignar'):
+            return
+        termino = self._entry_busq_asignar.get().strip().lower()
+        for item in self._tabla_asignar.get_children():
+            self._tabla_asignar.delete(item)
+        if not termino:
+            return
+        for col in self._datos_asignar:
+            nombre_completo = (col["nombre"] + " " + col["apellidos"]).lower()
+            if termino in nombre_completo or termino in col["dpi"].lower():
+                self._tabla_asignar.insert("", "end", values=(
+                    col["id"], col["nombre"], col["apellidos"], col["dpi"],
+                    col["edad"], col["direccion"], col["telefono"]
+                ))
+
+    def _click_asignar(self, event=None):
+        if not hasattr(self, '_tabla_asignar'):
+            return
+        sel = self._tabla_asignar.selection()
+        if not sel:
+            return
+        vals = self._tabla_asignar.item(sel[0])["values"]
+        col_id = vals[0]
+        # Find full data
+        col_data = next((c for c in self._datos_asignar if str(c["id"]) == str(col_id)), None)
+        if not col_data:
+            return
+        self._abrir_ventana_asignar(col_data)
+
+    def _abrir_ventana_asignar(self, col_data):
+        vent = tk.Toplevel(self.root)
+        vent.title("Asignar Puesto")
+        vent.configure(bg="#FFFFFF")
+        vent.transient(self.root)
+        vent.grab_set()
+        vent.update_idletasks()
+        w, h = 480, 520
+        x = (vent.winfo_screenwidth() // 2) - (w // 2)
+        y = (vent.winfo_screenheight() // 2) - (h // 2)
+        vent.geometry(f"{w}x{h}+{x}+{y}")
+
+        tk.Label(vent, text="Datos del Colaborador", font=("Arial", 14, "bold"),
+                 bg="#FFFFFF", fg=self.COLOR_AZUL).pack(pady=(15, 5))
+
+        frame_datos = tk.Frame(vent, bg="#FFFFFF")
+        frame_datos.pack(padx=30, pady=5, fill="x")
+
+        datos_mostrar = [
+            ("Nombre:", col_data["nombre"]),
+            ("Apellidos:", col_data["apellidos"]),
+            ("DPI:", col_data["dpi"]),
+            ("Edad:", col_data["edad"]),
+            ("Dirección:", col_data["direccion"]),
+            ("Teléfono:", col_data["telefono"]),
+        ]
+        for i, (lbl, val) in enumerate(datos_mostrar):
+            tk.Label(frame_datos, text=lbl, font=("Arial", 10, "bold"),
+                     bg="#FFFFFF", anchor="e", width=12).grid(row=i, column=0, sticky="e", pady=5, padx=5)
+            tk.Label(frame_datos, text=val, font=("Arial", 10),
+                     bg="#F0F4FA", anchor="w", width=28, relief="groove", pady=3).grid(row=i, column=1, sticky="ew", pady=5, padx=5)
+
+        tk.Frame(vent, bg="#CCCCCC", height=1).pack(fill="x", padx=20, pady=8)
+
+        frame_asig = tk.Frame(vent, bg="#FFFFFF")
+        frame_asig.pack(padx=30, fill="x")
+
+        tk.Label(frame_asig, text="Seleccionar Puesto:", font=("Arial", 10, "bold"),
+                 bg="#FFFFFF", anchor="e", width=18).grid(row=0, column=0, sticky="e", pady=8, padx=5)
+        combo_puesto = ttk.Combobox(frame_asig, values=PuestosDB.obtener_todos(), font=("Arial", 10), width=22)
+        combo_puesto.grid(row=0, column=1, sticky="ew", pady=8, padx=5)
+
+        tk.Label(frame_asig, text="Código de Empleado:", font=("Arial", 10, "bold"),
+                 bg="#FFFFFF", anchor="e", width=18).grid(row=1, column=0, sticky="e", pady=8, padx=5)
+        entry_codigo = tk.Entry(frame_asig, font=("Arial", 10), width=24)
+        entry_codigo.grid(row=1, column=1, sticky="ew", pady=8, padx=5)
+
+        frame_btns = tk.Frame(vent, bg="#FFFFFF")
+        frame_btns.pack(pady=15)
+
+        def contratar():
+            puesto = combo_puesto.get().strip()
+            codigo = entry_codigo.get().strip()
+            if not puesto or not codigo:
+                messagebox.showerror("Error", "Debe seleccionar un puesto y asignar un código.", parent=vent)
+                return
+            if ColaboradoresDB.asignar_puesto_codigo(col_data["id"], puesto, codigo):
+                nombre_completo = f"{col_data['nombre']} {col_data['apellidos']}"
+                messagebox.showinfo("Éxito", f"{nombre_completo} contratado correctamente", parent=vent)
+                self._datos_asignar = ColaboradoresDB.obtener_sin_puesto()
+                self._filtrar_asignar()
+                vent.destroy()
+            else:
+                messagebox.showerror("Error", "No se pudo completar la asignación.", parent=vent)
+
+        tk.Button(frame_btns, text="Contratar", font=("Arial", 11, "bold"),
+                  bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
+                  command=contratar).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="Regresar", font=("Arial", 11, "bold"),
+                  bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
+                  command=vent.destroy).pack(side="left", padx=10)
+
+
+    def _rrhh_generar_credenciales(self):
+        import random
+        self._rrhh_limpiar_der()
+        tk.Label(self.frame_rrhh_der, text="Generar Credenciales para Empleado",
+                 font=("Arial", 14, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(15, 5))
+        tk.Label(self.frame_rrhh_der,
+                 text="Haga clic en un empleado para generar sus credenciales automáticamente.",
+                 font=("Arial", 9, "italic"), bg=self.COLOR_FONDO, fg="#666666").pack()
+
+        frame_busq = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        frame_busq.pack(fill="x", padx=15, pady=5)
+        tk.Label(frame_busq, text="Buscar aspirante por nombre o DPI:", font=("Arial", 10, "bold"),
+                 bg=self.COLOR_FONDO).pack(side="left", padx=5)
+        self._entry_busq_cred = tk.Entry(frame_busq, font=("Arial", 10), width=30)
+        self._entry_busq_cred.pack(side="left", padx=5)
+        self._entry_busq_cred.bind("<KeyRelease>", self._filtrar_credenciales)
+
+        frame_tabla = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        frame_tabla.pack(fill="both", expand=True, padx=10, pady=5)
+        sb = ttk.Scrollbar(frame_tabla)
+        sb.pack(side="right", fill="y")
+
+        cols = ("ID", "Código", "Nombre", "Apellidos", "DPI", "Puesto", "Usuario")
+        self._tabla_cred = ttk.Treeview(frame_tabla, columns=cols, show="headings",
+                                        yscrollcommand=sb.set, height=15)
+        sb.config(command=self._tabla_cred.yview)
+        anchos = [0, 80, 140, 140, 110, 120, 130]
+        for col, w in zip(cols, anchos):
+            self._tabla_cred.heading(col, text=col)
+            self._tabla_cred.column(col, width=w)
+        self._tabla_cred.column("ID", width=0, stretch=False)
+        self._tabla_cred.pack(fill="both", expand=True)
+        self._tabla_cred.bind("<ButtonRelease-1>", self._click_generar_credencial)
+        self._datos_cred = ColaboradoresDB.obtener_con_puesto()
+
+    def _filtrar_credenciales(self, event=None):
+        if not hasattr(self, '_tabla_cred'):
+            return
+        termino = self._entry_busq_cred.get().strip().lower()
+        for item in self._tabla_cred.get_children():
+            self._tabla_cred.delete(item)
+        if not termino:
+            return
+        for col in self._datos_cred:
+            nombre_completo = (col["nombre"] + " " + col["apellidos"]).lower()
+            if termino in nombre_completo or termino in col["dpi"].lower():
+                self._tabla_cred.insert("", "end", values=(
+                    col["id"], col["codigo"], col["nombre"], col["apellidos"],
+                    col["dpi"], col["puesto"], col["usuario"]
+                ))
+
+    def _click_generar_credencial(self, event=None):
+        import random
+        if not hasattr(self, '_tabla_cred'):
+            return
+        sel = self._tabla_cred.selection()
+        if not sel:
+            return
+        vals = self._tabla_cred.item(sel[0])["values"]
+        col_id = vals[0]
+        col_data = next((c for c in self._datos_cred if str(c["id"]) == str(col_id)), None)
+        if not col_data:
+            return
+
+        if col_data["usuario"]:
+            messagebox.showinfo("Credenciales ya generadas",
+                                f"Este empleado ya tiene usuario: {col_data['usuario']}")
+            return
+
+        nombre = col_data["nombre"].lower().replace(" ", "")
+        apellido = col_data["apellidos"].lower().replace(" ", "")
+        base = (nombre[:3] + apellido[:3]).ljust(6, "x")
+
+        # Generate unique user
+        intentos = 0
+        while intentos < 100:
+            nums = "".join(str(random.randint(0, 9)) for _ in range(3))
+            usuario = base + nums
+            if not ColaboradoresDB.usuario_existe(usuario):
+                break
+            intentos += 1
+
+        contrasena = usuario[::-1]
+
+        if ColaboradoresDB.asignar_credenciales(col_id, usuario, contrasena):
+            self._datos_cred = ColaboradoresDB.obtener_con_puesto()
+            self._filtrar_credenciales()
+            messagebox.showinfo("Credenciales generadas",
+                                f"Usuario: {usuario}\nContraseña: {contrasena}\n\n"
+                                f"(Contraseña = usuario al revés)")
+        else:
+            messagebox.showerror("Error", "No se pudieron guardar las credenciales.")
+
+    # ── Eliminar colaborador ─────────────────────────────────────────
+    def _rrhh_eliminar_colaborador(self):
+        self._rrhh_limpiar_der()
+        tk.Label(self.frame_rrhh_der, text="Eliminar Colaborador",
+                 font=("Arial", 14, "bold"), bg=self.COLOR_FONDO, fg="#DC3545").pack(pady=(15, 5))
+        tk.Label(self.frame_rrhh_der,
+                 text="Seleccione un colaborador y presione Eliminar.",
+                 font=("Arial", 9, "italic"), bg=self.COLOR_FONDO, fg="#666666").pack()
+
+        frame_tabla = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        frame_tabla.pack(fill="both", expand=True, padx=10, pady=5)
+        sb = ttk.Scrollbar(frame_tabla)
+        sb.pack(side="right", fill="y")
+
+        cols = ("ID", "Código", "Nombre", "Apellidos", "DPI", "Puesto")
+        self._tabla_elim = ttk.Treeview(frame_tabla, columns=cols, show="headings",
+                                        yscrollcommand=sb.set, height=16)
+        sb.config(command=self._tabla_elim.yview)
+        anchos = [0, 80, 180, 180, 120, 150]
+        for col, w in zip(cols, anchos):
+            self._tabla_elim.heading(col, text=col)
+            self._tabla_elim.column(col, width=w)
+        self._tabla_elim.column("ID", width=0, stretch=False)
+        self._tabla_elim.pack(fill="both", expand=True)
+
+        for col in ColaboradoresDB.obtener_todos():
+            self._tabla_elim.insert("", "end", values=(
+                col["id"], col["codigo"], col["nombre"], col["apellidos"], col["dpi"], col["puesto"]
+            ))
+
+        tk.Button(self.frame_rrhh_der, text="Eliminar Seleccionado",
+                  font=("Arial", 11, "bold"), bg="#DC3545", fg="white",
+                  relief="flat", cursor="hand2", padx=25, pady=8,
+                  command=self._confirmar_eliminar_colaborador).pack(pady=10)
+
+    def _confirmar_eliminar_colaborador(self):
+        if not hasattr(self, '_tabla_elim'):
+            return
+        sel = self._tabla_elim.selection()
+        if not sel:
+            messagebox.showwarning("Advertencia", "Seleccione un colaborador para eliminar.")
+            return
+        vals = self._tabla_elim.item(sel[0])["values"]
+        nombre_completo = f"{vals[2]} {vals[3]}"
+        respuesta = messagebox.askyesno("Confirmar", f"¿Eliminar al colaborador '{nombre_completo}'?")
+        if respuesta and ColaboradoresDB.eliminar(vals[0]):
+            self._tabla_elim.delete(sel[0])
+            messagebox.showinfo("Éxito", "Colaborador eliminado correctamente.")
 
 class VentanaAgregarCategoria:
     def __init__(self, parent, sistema):
