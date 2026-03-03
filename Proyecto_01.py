@@ -1334,14 +1334,11 @@ class SistemaGEOS:
         self._rrhh_mostrar_bienvenida()
 
     def _seleccionar_boton_rrhh(self, texto_boton, comando_accion):
-        # 1. Resetear todos los botones al color azul original
         for btn in self.botones_rrhh_lateral.values():
             btn.config(bg=self.COLOR_AZUL)
 
-        # 2. Resaltar el botón clickeado con el azul claro (celeste)
         self.botones_rrhh_lateral[texto_boton].config(bg=self.COLOR_AZUL_CLARO)
 
-        # 3. Ejecutar la función original (ej. self._rrhh_contratar)
         comando_accion()
 
     def _rrhh_limpiar_der(self):
@@ -1351,11 +1348,40 @@ class SistemaGEOS:
     def _rrhh_mostrar_bienvenida(self):
         self._rrhh_limpiar_der()
 
-        frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA",
-                             highlightbackground="#CCCCCC", highlightthickness=1)
-        frame_img.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.9)
-        tk.Label(frame_img, text="[ Imagen RRHH ]", font=("Arial", 18), bg="#F0F4FA",
-                 fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+        ruta_script = os.path.dirname(os.path.abspath(__file__))
+        ruta_rrhh = os.path.join(ruta_script, "RRHH.png")
+
+        try:
+            from PIL import Image, ImageTk
+            img_pil = Image.open(ruta_rrhh)
+            img_ancho, img_alto = img_pil.size
+
+            self._foto_rrhh = ImageTk.PhotoImage(img_pil)
+
+            frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA",highlightbackground="#CCCCCC", highlightthickness=1,width=img_ancho, height=img_alto)
+            frame_img.place(relx=0.5, rely=0.5, anchor="center")
+            frame_img.pack_propagate(False)
+
+            lbl_img = tk.Label(frame_img, image=self._foto_rrhh, bg="#F0F4FA")
+            lbl_img.place(relx=0.5, rely=0.5, anchor="center")
+
+        except ImportError:
+            try:
+                self._foto_rrhh = tk.PhotoImage(file=ruta_rrhh)
+                img_ancho = self._foto_rrhh.width()
+                img_alto = self._foto_rrhh.height()
+
+                frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA",highlightbackground="#CCCCCC", highlightthickness=1,width=img_ancho, height=img_alto)
+                frame_img.place(relx=0.5, rely=0.5, anchor="center")
+                frame_img.pack_propagate(False)
+
+                lbl_img = tk.Label(frame_img, image=self._foto_rrhh, bg="#F0F4FA")
+                lbl_img.place(relx=0.5, rely=0.5, anchor="center")
+
+            except Exception:
+                tk.Label(self.frame_rrhh_der, text="[ Imagen RRHH ]", font=("Arial", 18),bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+        except Exception:
+            tk.Label(self.frame_rrhh_der, text="[ Imagen RRHH ]", font=("Arial", 18),bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
 
     def _rrhh_proximamente(self):
         self._rrhh_limpiar_der()
@@ -1380,8 +1406,7 @@ class SistemaGEOS:
         canvas_scroll.bind("<Configure>", _on_resize)
         inner.bind("<Configure>", lambda e: canvas_scroll.configure(scrollregion=canvas_scroll.bbox("all")))
 
-        tk.Label(inner, text="Ingresar Postulante", font=("Arial", 15, "bold"),
-                 bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(20, 10))
+        tk.Label(inner, text="Ingresar Postulante", font=("Arial", 15, "bold"),bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(20, 10))
 
         frame_form = tk.Frame(inner, bg=self.COLOR_FONDO)
         frame_form.pack(padx=60, pady=5, fill="x")
@@ -1390,33 +1415,23 @@ class SistemaGEOS:
         campos_labels = ["Nombre:", "Apellidos:", "DPI:", "Edad:", "Dirección:", "Teléfono:"]
         self._rrhh_entries = {}
         for i, label in enumerate(campos_labels):
-            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"),
-                     bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=i, column=0, sticky="e", pady=7, padx=5)
+            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"),bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=i, column=0, sticky="e", pady=7, padx=5)
             entry = tk.Entry(frame_form, font=("Arial", 10), width=35)
             entry.grid(row=i, column=1, sticky="ew", pady=7, padx=5)
             self._rrhh_entries[label] = entry
 
-        tk.Label(frame_form, text="Importar CV:", font=("Arial", 10, "bold"),
-                 bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=6, column=0, sticky="e", pady=7, padx=5)
+        tk.Label(frame_form, text="Importar CV:", font=("Arial", 10, "bold"),bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=6, column=0, sticky="e", pady=7, padx=5)
         frame_cv = tk.Frame(frame_form, bg=self.COLOR_FONDO)
         frame_cv.grid(row=6, column=1, sticky="ew", pady=7, padx=5)
         self._rrhh_cv_path = tk.StringVar(value="")
-        self._lbl_cv = tk.Label(frame_cv, text="Ningún archivo seleccionado",
-                                font=("Arial", 9), bg=self.COLOR_FONDO, fg="#666666")
+        self._lbl_cv = tk.Label(frame_cv, text="Ningún archivo seleccionado",font=("Arial", 9), bg=self.COLOR_FONDO, fg="#666666")
         self._lbl_cv.pack(side="left", padx=(0, 10))
-        tk.Button(frame_cv, text="Seleccionar PDF", font=("Arial", 9, "bold"),
-                  bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,
-                  cursor="hand2", padx=8, pady=3,
-                  command=self._rrhh_seleccionar_cv).pack(side="left")
+        tk.Button(frame_cv, text="Seleccionar PDF", font=("Arial", 9, "bold"),bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,cursor="hand2", padx=8, pady=3,command=self._rrhh_seleccionar_cv).pack(side="left")
 
         frame_btns = tk.Frame(inner, bg=self.COLOR_FONDO)
         frame_btns.pack(pady=20)
-        tk.Button(frame_btns, text="Confirmar", font=("Arial", 11, "bold"),
-                  bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,
-                  command=self._rrhh_confirmar_contratacion).pack(side="left", padx=10)
-        tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),
-                  bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,
-                  command=self._rrhh_limpiar_contratacion).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="Confirmar", font=("Arial", 11, "bold"),bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,command=self._rrhh_confirmar_contratacion).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,command=self._rrhh_limpiar_contratacion).pack(side="left", padx=10)
 
     def _rrhh_seleccionar_cv(self):
         from tkinter import filedialog
