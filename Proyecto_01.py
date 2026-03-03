@@ -108,6 +108,7 @@ class CategoriasDB:
         finally:
             conn.close()
 
+
 class ProductosDB:
     @staticmethod
     def obtener_todos():
@@ -321,6 +322,28 @@ class ColaboradoresDB:
             conn.close()
 
     @staticmethod
+    def obtener_siguiente_secuencia(puesto):
+        conn = TablasDB._conn()
+        try:
+            # Consultamos los códigos actuales para el puesto dado
+            cur = conn.execute("SELECT codigo FROM colaboradores WHERE puesto=?", (puesto,))
+            max_sec = 0
+            for row in cur:
+                cod = row["codigo"]
+                if cod and len(cod) >= 3:
+                    sufijo = cod[-3:]
+                    if sufijo.isdigit():
+                        val = int(sufijo)
+                        if val > max_sec:
+                            max_sec = val
+            return max_sec + 1
+        except Exception as e:
+            print(f"Error calculando secuencia: {e}")
+            return 1
+        finally:
+            conn.close()
+
+    @staticmethod
     def asignar_puesto_codigo(id_col, puesto, codigo):
         conn = TablasDB._conn()
         try:
@@ -373,18 +396,25 @@ class PuestosDB:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS puestos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT UNIQUE NOT NULL
+                nombre TEXT UNIQUE NOT NULL,
+                abreviatura TEXT
             )
         """)
+        # Intentar añadir la columna en caso de que la tabla ya exista de versiones anteriores
+        try:
+            conn.execute("ALTER TABLE puestos ADD COLUMN abreviatura TEXT")
+        except sqlite3.OperationalError:
+            pass  # La columna ya existe
+
         conn.commit()
         conn.close()
 
     @staticmethod
-    def agregar(nombre):
+    def agregar(nombre, abreviatura):
         PuestosDB.crear_tabla()
         conn = TablasDB._conn()
         try:
-            conn.execute("INSERT INTO puestos (nombre) VALUES (?)", (nombre,))
+            conn.execute("INSERT INTO puestos (nombre, abreviatura) VALUES (?, ?)", (nombre, abreviatura))
             conn.commit()
             return True
         except sqlite3.IntegrityError:
@@ -397,8 +427,9 @@ class PuestosDB:
         PuestosDB.crear_tabla()
         conn = TablasDB._conn()
         try:
-            cur = conn.execute("SELECT nombre FROM puestos ORDER BY nombre")
-            return [r["nombre"] for r in cur]
+            cur = conn.execute("SELECT nombre, abreviatura FROM puestos ORDER BY nombre")
+            # Devolvemos un diccionario para poder usar la info fácilmente
+            return [{"nombre": r["nombre"], "abreviatura": r["abreviatura"]} for r in cur]
         finally:
             conn.close()
 
@@ -413,21 +444,17 @@ class GeneradorRecibos:
         fecha_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         nombre_archivo = os.path.join(carpeta_recibos, f"recibo_{fecha_str}.pdf")
 
-
         c = canvas.Canvas(nombre_archivo, pagesize=letter)
         width, height = letter
-
 
         margen_izq = 40
         margen_der = width - 40
         y = height - 40
 
-
         c.setFillColorRGB(0.2, 0.4, 0.7)
         c.setFont("Helvetica-Bold", 18)
         c.drawCentredString(width / 2, y, "Factura")
         y -= 25
-
 
         c.setStrokeColorRGB(0.2, 0.4, 0.7)
         c.setLineWidth(2)
@@ -478,7 +505,6 @@ class GeneradorRecibos:
         c.line(margen_izq, y, margen_der, y)
         y -= 20
 
-
         tabla_y = y
         c.setFillColorRGB(0.9, 0.9, 0.9)
         c.rect(margen_izq, tabla_y - 15, margen_der - margen_izq, 15, fill=1, stroke=0)
@@ -516,7 +542,6 @@ class GeneradorRecibos:
                 c.showPage()
                 y = height - 50
                 c.setFont("Helvetica", 9)
-
 
             c.drawString(col_no, y, str(item_num))
 
@@ -784,11 +809,13 @@ class SistemaGEOS:
 
         frame_nit = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
         frame_nit.pack(fill="x", pady=5, padx=20)
-        tk.Label(frame_nit, text="NIT Receptor:", font=("Arial", 10, "bold"), bg=self.COLOR_FONDO).pack(side="left", padx=5)
+        tk.Label(frame_nit, text="NIT Receptor:", font=("Arial", 10, "bold"), bg=self.COLOR_FONDO).pack(side="left",
+                                                                                                        padx=5)
         self.entry_nit_receptor = tk.Entry(frame_nit, font=("Arial", 10), width=15)
         self.entry_nit_receptor.pack(side="left", padx=5)
         self.entry_nit_receptor.insert(0, "C/F")
-        tk.Label(frame_nit, text="(C/F para consumidor final)", font=("Arial", 8, "italic"), bg=self.COLOR_FONDO, fg="#666").pack(side="left", padx=5)
+        tk.Label(frame_nit, text="(C/F para consumidor final)", font=("Arial", 8, "italic"), bg=self.COLOR_FONDO,
+                 fg="#666").pack(side="left", padx=5)
 
         paned = tk.PanedWindow(self.frame_contenido, orient="horizontal", bg="#DDDDDD", sashwidth=5)
         paned.pack(fill="both", expand=True)
@@ -826,7 +853,8 @@ class SistemaGEOS:
 
         self.tabla_prod_venta.pack(fill="both", expand=True, padx=10, pady=5)
 
-        self.tabla_prod_venta.bind("<Double-1>", lambda event: self.agregar_al_carrito())
+        # Se agrega identificar la fila para evitar clics vacíos
+        self.tabla_prod_venta.bind("<Double-1>", self.agregar_al_carrito)
 
         self.cargar_productos_venta()
 
@@ -844,7 +872,8 @@ class SistemaGEOS:
         frame_der = tk.Frame(paned, bg="white", width=400)
         paned.add(frame_der)
 
-        tk.Label(frame_der, text="CARRITO DE COMPRAS", font=("Arial", 12, "bold"), bg="white", fg=self.COLOR_AZUL).pack(pady=10)
+        tk.Label(frame_der, text="CARRITO DE COMPRAS", font=("Arial", 12, "bold"), bg="white", fg=self.COLOR_AZUL).pack(
+            pady=10)
 
         col_c = ("Prod", "Cant", "Total")
         self.tabla_carrito = ttk.Treeview(frame_der, columns=col_c, show="headings")
@@ -898,7 +927,11 @@ class SistemaGEOS:
                                              values=(p["id_num"], p["codigo"], p["nombre"], f"${p['precio_venta']}",
                                                      p["cantidad"], p["categoria"]))
 
-    def agregar_al_carrito(self):
+    def agregar_al_carrito(self, event=None):
+        if event and not hasattr(self, 'tabla_prod_venta'): return
+        # Validar que no se hizo click en espacio en blanco
+        if event and not self.tabla_prod_venta.identify_row(event.y): return
+
         seleccion = self.tabla_prod_venta.selection()
         if not seleccion:
             messagebox.showwarning("Atención", "Seleccione un producto de la lista izquierda.")
@@ -1029,7 +1062,7 @@ class SistemaGEOS:
         scroll_y.config(command=self.tabla.yview)
         scroll_x.config(command=self.tabla.xview)
         self.tabla.pack(fill="both", expand=True)
-        self.tabla.bind("<Double-1>", lambda e: self.editar_item())
+        self.tabla.bind("<Double-1>", self.editar_item)
 
     def cargar_datos(self):
         if not hasattr(self, 'tabla'): return
@@ -1071,7 +1104,10 @@ class SistemaGEOS:
     def agregar_item(self):
         VentanaAgregar(self.root, self)
 
-    def editar_item(self):
+    def editar_item(self, event=None):
+        if event and not hasattr(self, 'tabla'): return
+        if event and not self.tabla.identify_row(event.y): return
+
         seleccion = self.tabla.selection()
         if not seleccion:
             messagebox.showwarning("Advertencia", "Por favor seleccione un ítem para editar")
@@ -1189,7 +1225,7 @@ class SistemaGEOS:
             self.tabla_proveedores.column(col, width=width)
 
         self.tabla_proveedores.pack(fill="both", expand=True, padx=5, pady=5)
-        self.tabla_proveedores.bind("<Double-1>", lambda e: self.editar_proveedor())
+        self.tabla_proveedores.bind("<Double-1>", self.editar_proveedor)
         self.cargar_proveedores()
 
     def clear_buscar_proveedor(self, event):
@@ -1229,8 +1265,10 @@ class SistemaGEOS:
     def agregar_proveedor(self):
         VentanaAgregarProveedor(self.root, self)
 
-    def editar_proveedor(self):
+    def editar_proveedor(self, event=None):
         if not hasattr(self, 'tabla_proveedores'): return
+        if event and not self.tabla_proveedores.identify_row(event.y): return
+
         seleccion = self.tabla_proveedores.selection()
         if not seleccion:
             messagebox.showwarning("Advertencia", "Seleccione un proveedor para editar")
@@ -1254,7 +1292,6 @@ class SistemaGEOS:
             self.cargar_proveedores()
             messagebox.showinfo("Éxito", "Proveedor eliminado correctamente")
 
-
     def mostrar_rrhh(self):
         for widget in self.frame_contenido.winfo_children():
             widget.destroy()
@@ -1272,23 +1309,40 @@ class SistemaGEOS:
                          relief="flat", cursor="hand2", padx=8, pady=7, anchor="w")
 
         botones_rrhh = [
-            ("Ingresar Postulante",              self._rrhh_contratar),
-            ("Ver colaboradores por contratar",  self._rrhh_ver_postulantes),
-            ("Generar Puesto",                   self._rrhh_generar_puesto),
-            ("Asignar puesto a colaborador",     self._rrhh_asignar_puesto),
+            ("Ingresar Postulante", self._rrhh_contratar),
+            ("Ver colaboradores por contratar", self._rrhh_ver_postulantes),
+            ("Generar Puesto", self._rrhh_generar_puesto),
+            ("Asignar puesto a colaborador", self._rrhh_asignar_puesto),
             ("Generar credenciales para empleado", self._rrhh_generar_credenciales),
-            ("Nómina",                           self._rrhh_proximamente),
-            ("Eliminar colaborador",             self._rrhh_eliminar_colaborador),
+            ("Nómina", self._rrhh_proximamente),
+            ("Eliminar colaborador", self._rrhh_eliminar_colaborador),
         ]
 
+        # Diccionario para guardar los botones y poder cambiarles el color después
+        self.botones_rrhh_lateral = {}
+
         for texto, cmd in botones_rrhh:
-            tk.Button(frame_izq, text=texto, **btn_style,
-                      command=lambda c=cmd: c()).pack(fill="x", padx=10, pady=3)
+            btn = tk.Button(frame_izq, text=texto, **btn_style)
+            # Pasamos el texto y el comando a la nueva función gestora
+            btn.config(command=lambda c=cmd, t=texto: self._seleccionar_boton_rrhh(t, c))
+            btn.pack(fill="x", padx=10, pady=3)
+            self.botones_rrhh_lateral[texto] = btn
 
         self.frame_rrhh_der = tk.Frame(paned, bg=self.COLOR_FONDO)
         paned.add(self.frame_rrhh_der, minsize=400)
 
         self._rrhh_mostrar_bienvenida()
+
+    def _seleccionar_boton_rrhh(self, texto_boton, comando_accion):
+        # 1. Resetear todos los botones al color azul original
+        for btn in self.botones_rrhh_lateral.values():
+            btn.config(bg=self.COLOR_AZUL)
+
+        # 2. Resaltar el botón clickeado con el azul claro (celeste)
+        self.botones_rrhh_lateral[texto_boton].config(bg=self.COLOR_AZUL_CLARO)
+
+        # 3. Ejecutar la función original (ej. self._rrhh_contratar)
+        comando_accion()
 
     def _rrhh_limpiar_der(self):
         for widget in self.frame_rrhh_der.winfo_children():
@@ -1322,6 +1376,7 @@ class SistemaGEOS:
 
         def _on_resize(e):
             canvas_scroll.itemconfig(win_id, width=e.width)
+
         canvas_scroll.bind("<Configure>", _on_resize)
         inner.bind("<Configure>", lambda e: canvas_scroll.configure(scrollregion=canvas_scroll.bbox("all")))
 
@@ -1438,8 +1493,9 @@ class SistemaGEOS:
             ))
 
     def _rrhh_ver_cv_postulante(self, event=None):
-        if not hasattr(self, '_tabla_postulantes'):
-            return
+        if not hasattr(self, '_tabla_postulantes'): return
+        if event and not self._tabla_postulantes.identify_row(event.y): return
+
         sel = self._tabla_postulantes.selection()
         if not sel:
             return
@@ -1469,10 +1525,17 @@ class SistemaGEOS:
 
         frame_inp = tk.Frame(outer, bg=self.COLOR_FONDO)
         frame_inp.pack()
+
         tk.Label(frame_inp, text="Nombre del puesto:", font=("Arial", 11, "bold"),
                  bg=self.COLOR_FONDO).grid(row=0, column=0, sticky="e", padx=10, pady=8)
         self._entry_puesto = tk.Entry(frame_inp, font=("Arial", 11), width=30)
         self._entry_puesto.grid(row=0, column=1, padx=10, pady=8)
+
+        # Novedad: Agregamos Abreviatura
+        tk.Label(frame_inp, text="Abreviatura:", font=("Arial", 11, "bold"),
+                 bg=self.COLOR_FONDO).grid(row=1, column=0, sticky="e", padx=10, pady=8)
+        self._entry_abrev = tk.Entry(frame_inp, font=("Arial", 11), width=30)
+        self._entry_abrev.grid(row=1, column=1, padx=10, pady=8)
 
         tk.Button(outer, text="Guardar Puesto", font=("Arial", 11, "bold"),
                   bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
@@ -1491,20 +1554,29 @@ class SistemaGEOS:
             return
         self._lista_puestos.delete(0, "end")
         for p in PuestosDB.obtener_todos():
-            self._lista_puestos.insert("end", p)
+            # Formateamos para que muestre: Nombre (ABREV)
+            abrev = p["abreviatura"] if p["abreviatura"] else ""
+            mostrar = f"{p['nombre']} ({abrev})" if abrev else p['nombre']
+            self._lista_puestos.insert("end", mostrar)
 
     def _rrhh_guardar_puesto(self):
         nombre = self._entry_puesto.get().strip()
+        abrev = self._entry_abrev.get().strip()
+
         if not nombre:
             messagebox.showerror("Error", "Ingrese un nombre para el puesto.")
             return
-        if PuestosDB.agregar(nombre):
+        if not abrev:
+            messagebox.showerror("Error", "Ingrese una abreviatura para el puesto.")
+            return
+
+        if PuestosDB.agregar(nombre, abrev):
             self._entry_puesto.delete(0, "end")
+            self._entry_abrev.delete(0, "end")
             self._actualizar_lista_puestos()
             messagebox.showinfo("Éxito", f"Puesto '{nombre}' creado correctamente.")
         else:
             messagebox.showerror("Error", "El puesto ya existe.")
-
 
     def _rrhh_asignar_puesto(self):
         self._rrhh_limpiar_der()
@@ -1534,9 +1606,13 @@ class SistemaGEOS:
             self._tabla_asignar.column(col, width=w)
         self._tabla_asignar.column("ID", width=0, stretch=False)
         self._tabla_asignar.pack(fill="both", expand=True)
-        self._tabla_asignar.bind("<ButtonRelease-1>", self._click_asignar)
-        # Load empty by default
+
+        # Se cambia de <ButtonRelease-1> a doble click <Double-1>
+        self._tabla_asignar.bind("<Double-1>", self._click_asignar)
+
+        # Cargar datos por defecto y mostrarlos en la tabla inmediatamente
         self._datos_asignar = ColaboradoresDB.obtener_sin_puesto()
+        self._filtrar_asignar()
 
     def _filtrar_asignar(self, event=None):
         if not hasattr(self, '_tabla_asignar'):
@@ -1544,19 +1620,19 @@ class SistemaGEOS:
         termino = self._entry_busq_asignar.get().strip().lower()
         for item in self._tabla_asignar.get_children():
             self._tabla_asignar.delete(item)
-        if not termino:
-            return
+
         for col in self._datos_asignar:
             nombre_completo = (col["nombre"] + " " + col["apellidos"]).lower()
-            if termino in nombre_completo or termino in col["dpi"].lower():
+            if not termino or termino in nombre_completo or termino in col["dpi"].lower():
                 self._tabla_asignar.insert("", "end", values=(
                     col["id"], col["nombre"], col["apellidos"], col["dpi"],
                     col["edad"], col["direccion"], col["telefono"]
                 ))
 
     def _click_asignar(self, event=None):
-        if not hasattr(self, '_tabla_asignar'):
-            return
+        if not hasattr(self, '_tabla_asignar'): return
+        if event and not self._tabla_asignar.identify_row(event.y): return
+
         sel = self._tabla_asignar.selection()
         if not sel:
             return
@@ -1598,7 +1674,8 @@ class SistemaGEOS:
             tk.Label(frame_datos, text=lbl, font=("Arial", 10, "bold"),
                      bg="#FFFFFF", anchor="e", width=12).grid(row=i, column=0, sticky="e", pady=5, padx=5)
             tk.Label(frame_datos, text=val, font=("Arial", 10),
-                     bg="#F0F4FA", anchor="w", width=28, relief="groove", pady=3).grid(row=i, column=1, sticky="ew", pady=5, padx=5)
+                     bg="#F0F4FA", anchor="w", width=28, relief="groove", pady=3).grid(row=i, column=1, sticky="ew",
+                                                                                       pady=5, padx=5)
 
         tk.Frame(vent, bg="#CCCCCC", height=1).pack(fill="x", padx=20, pady=8)
 
@@ -1607,13 +1684,46 @@ class SistemaGEOS:
 
         tk.Label(frame_asig, text="Seleccionar Puesto:", font=("Arial", 10, "bold"),
                  bg="#FFFFFF", anchor="e", width=18).grid(row=0, column=0, sticky="e", pady=8, padx=5)
-        combo_puesto = ttk.Combobox(frame_asig, values=PuestosDB.obtener_todos(), font=("Arial", 10), width=22)
+
+        # Adaptamos el listado para extraer solo el 'nombre' del diccionario que ahora devuelve PuestosDB
+        todos_los_puestos = PuestosDB.obtener_todos()
+        puestos_lista = [p["nombre"] for p in todos_los_puestos]
+
+        combo_puesto = ttk.Combobox(frame_asig, values=puestos_lista, font=("Arial", 10), width=22)
         combo_puesto.grid(row=0, column=1, sticky="ew", pady=8, padx=5)
 
         tk.Label(frame_asig, text="Código de Empleado:", font=("Arial", 10, "bold"),
                  bg="#FFFFFF", anchor="e", width=18).grid(row=1, column=0, sticky="e", pady=8, padx=5)
         entry_codigo = tk.Entry(frame_asig, font=("Arial", 10), width=24)
         entry_codigo.grid(row=1, column=1, sticky="ew", pady=8, padx=5)
+
+        # ---- FUNCIÓN PARA GENERAR CÓDIGO AUTOMÁTICO ----
+        def autocompletar_codigo(event=None):
+            puesto_seleccionado = combo_puesto.get().strip()
+            if not puesto_seleccionado:
+                return
+
+            # Buscar abreviatura del puesto seleccionado
+            abreviatura = ""
+            for p in todos_los_puestos:
+                if p["nombre"] == puesto_seleccionado:
+                    abreviatura = p["abreviatura"] if p["abreviatura"] else puesto_seleccionado[:3].upper()
+                    break
+
+            # Obtener el primer nombre (en mayúsculas)
+            primer_nombre = col_data["nombre"].strip().split()[0].upper()
+
+            # Obtener el correlativo secuencial
+            siguiente_num = ColaboradoresDB.obtener_siguiente_secuencia(puesto_seleccionado)
+
+            # Generar el código con el formato solicitado (Ej. JUAN-VEN001)
+            nuevo_codigo = f"{primer_nombre}-{abreviatura.upper()}{siguiente_num:03d}"
+
+            entry_codigo.delete(0, tk.END)
+            entry_codigo.insert(0, nuevo_codigo)
+
+        # Enlazamos el evento al combobox
+        combo_puesto.bind("<<ComboboxSelected>>", autocompletar_codigo)
 
         frame_btns = tk.Frame(vent, bg="#FFFFFF")
         frame_btns.pack(pady=15)
@@ -1639,7 +1749,6 @@ class SistemaGEOS:
         tk.Button(frame_btns, text="Regresar", font=("Arial", 11, "bold"),
                   bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
                   command=vent.destroy).pack(side="left", padx=10)
-
 
     def _rrhh_generar_credenciales(self):
         import random
@@ -1673,8 +1782,13 @@ class SistemaGEOS:
             self._tabla_cred.column(col, width=w)
         self._tabla_cred.column("ID", width=0, stretch=False)
         self._tabla_cred.pack(fill="both", expand=True)
-        self._tabla_cred.bind("<ButtonRelease-1>", self._click_generar_credencial)
+
+        # Se cambia a doble click
+        self._tabla_cred.bind("<Double-1>", self._click_generar_credencial)
+
+        # Cargar y mostrar datos al inicio
         self._datos_cred = ColaboradoresDB.obtener_con_puesto()
+        self._filtrar_credenciales()
 
     def _filtrar_credenciales(self, event=None):
         if not hasattr(self, '_tabla_cred'):
@@ -1682,11 +1796,10 @@ class SistemaGEOS:
         termino = self._entry_busq_cred.get().strip().lower()
         for item in self._tabla_cred.get_children():
             self._tabla_cred.delete(item)
-        if not termino:
-            return
+
         for col in self._datos_cred:
             nombre_completo = (col["nombre"] + " " + col["apellidos"]).lower()
-            if termino in nombre_completo or termino in col["dpi"].lower():
+            if not termino or termino in nombre_completo or termino in col["dpi"].lower():
                 self._tabla_cred.insert("", "end", values=(
                     col["id"], col["codigo"], col["nombre"], col["apellidos"],
                     col["dpi"], col["puesto"], col["usuario"]
@@ -1694,8 +1807,9 @@ class SistemaGEOS:
 
     def _click_generar_credencial(self, event=None):
         import random
-        if not hasattr(self, '_tabla_cred'):
-            return
+        if not hasattr(self, '_tabla_cred'): return
+        if event and not self._tabla_cred.identify_row(event.y): return
+
         sel = self._tabla_cred.selection()
         if not sel:
             return
@@ -1782,6 +1896,7 @@ class SistemaGEOS:
         if respuesta and ColaboradoresDB.eliminar(vals[0]):
             self._tabla_elim.delete(sel[0])
             messagebox.showinfo("Éxito", "Colaborador eliminado correctamente.")
+
 
 class VentanaAgregarCategoria:
     def __init__(self, parent, sistema):
