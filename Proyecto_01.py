@@ -72,6 +72,20 @@ class TablasDB:
                 total REAL
             );
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS cuentas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                tipo TEXT NOT NULL,
+                corriente TEXT NOT NULL,
+                estado_financiero TEXT NOT NULL DEFAULT 'Balance general',
+                valor REAL NOT NULL DEFAULT 0.0
+            );
+        """)
+        try:
+            conn.execute("ALTER TABLE cuentas ADD COLUMN estado_financiero TEXT NOT NULL DEFAULT 'Balance general'")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
         return conn
 
@@ -425,6 +439,58 @@ class PuestosDB:
             conn.close()
 
 
+class CuentasDB:
+    @staticmethod
+    def agregar(nombre, tipo, corriente, estado_financiero, valor):
+        conn = TablasDB._conn()
+        try:
+            conn.execute(
+                "INSERT INTO cuentas (nombre, tipo, corriente, estado_financiero, valor) VALUES (?, ?, ?, ?, ?)",
+                (nombre, tipo, corriente, estado_financiero, valor)
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def obtener_todas():
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("SELECT * FROM cuentas ORDER BY nombre")
+            return [{"id": r["id"], "nombre": r["nombre"], "tipo": r["tipo"],
+                     "corriente": r["corriente"], "estado_financiero": r["estado_financiero"],
+                     "valor": r["valor"]} for r in cursor]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def eliminar(id_cuenta):
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("DELETE FROM cuentas WHERE id = ?", (id_cuenta,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    @staticmethod
+    def actualizar(id_cuenta, nombre, tipo, corriente, estado_financiero, valor):
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute(
+                "UPDATE cuentas SET nombre=?, tipo=?, corriente=?, estado_financiero=?, valor=? WHERE id=?",
+                (nombre, tipo, corriente, estado_financiero, valor, id_cuenta)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+
 class GeneradorRecibos:
     @staticmethod
     def generar_recibo(carrito, total, nit_receptor="C/F"):
@@ -759,7 +825,7 @@ class SistemaGEOS:
         frame_pestanas = tk.Frame(frame_nav, bg=self.COLOR_AZUL)
         frame_pestanas.place(relx=0.5, rely=0.5, anchor="center")
 
-        pestanas = ["Inventario", "Ventas", "Proveedores", "Clientes", "Reportes", "RRHH"]
+        pestanas = ["Inventario", "Ventas", "Proveedores", "Clientes", "Reportes", "RRHH", "Finanzas"]
         self.botones_pestanas = {}
 
         for i, pestana in enumerate(pestanas):
@@ -790,6 +856,8 @@ class SistemaGEOS:
             self.mostrar_proveedores()
         elif pestana == "RRHH":
             self.mostrar_rrhh()
+        elif pestana == "Finanzas":
+            self.mostrar_finanzas()
         else:
             for widget in self.frame_contenido.winfo_children(): widget.destroy()
             tk.Label(self.frame_contenido, text=f"Sección {pestana} en construcción", font=("Arial", 14),
@@ -1307,12 +1375,12 @@ class SistemaGEOS:
             ("Eliminar colaborador", self._rrhh_eliminar_colaborador),
         ]
 
-        # Diccionario para guardar los botones y poder cambiarles el color después
+
         self.botones_rrhh_lateral = {}
 
         for texto, cmd in botones_rrhh:
             btn = tk.Button(frame_izq, text=texto, **btn_style)
-            # Pasamos el texto y el comando a la nueva función gestora
+
             btn.config(command=lambda c=cmd, t=texto: self._seleccionar_boton_rrhh(t, c))
             btn.pack(fill="x", padx=10, pady=3)
             self.botones_rrhh_lateral[texto] = btn
@@ -2005,7 +2073,7 @@ class SistemaGEOS:
 
         tk.Frame(vent, bg="#CCCCCC", height=1).pack(fill="x", padx=20, pady=10)
 
-        # Sección para el PDF de la carta de renuncia o despido
+
         frame_cv = tk.Frame(vent, bg="#FFFFFF")
         frame_cv.pack(pady=10)
 
@@ -2037,7 +2105,7 @@ class SistemaGEOS:
                   bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,
                   cursor="hand2", padx=8, pady=3, command=seleccionar_pdf).pack(side="left")
 
-        # Código de seguridad
+
         frame_sec = tk.Frame(vent, bg="#FFFFFF")
         frame_sec.pack(pady=15)
         tk.Label(frame_sec, text="Código de seguridad:", font=("Arial", 10, "bold"), bg="#FFFFFF").pack(side="left",
@@ -2045,7 +2113,7 @@ class SistemaGEOS:
         entry_codigo = tk.Entry(frame_sec, font=("Arial", 10), show="*", width=15)
         entry_codigo.pack(side="left", padx=5)
 
-        # Botones
+
         frame_btns = tk.Frame(vent, bg="#FFFFFF")
         frame_btns.pack(pady=20)
 
@@ -2070,6 +2138,515 @@ class SistemaGEOS:
         tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),
                   bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
                   command=vent.destroy).pack(side="left", padx=10)
+
+
+
+    def mostrar_finanzas(self):
+        for widget in self.frame_contenido.winfo_children():
+            widget.destroy()
+
+        paned = tk.PanedWindow(self.frame_contenido, orient="horizontal", bg="#DDDDDD", sashwidth=4)
+        paned.pack(fill="both", expand=True)
+
+        frame_izq = tk.Frame(paned, bg=self.COLOR_FONDO, width=210)
+        paned.add(frame_izq, minsize=180)
+
+        tk.Label(frame_izq, text="Finanzas", font=("Arial", 13, "bold"), bg=self.COLOR_FONDO,
+                 fg=self.COLOR_AZUL).pack(pady=(15, 10), padx=10)
+
+        btn_style = dict(font=("Arial", 9, "bold"), bg=self.COLOR_AZUL, fg="white",
+                         relief="flat", cursor="hand2", padx=8, pady=7, anchor="w")
+
+        botones_finanzas = [
+            ("Cuentas", self._finanzas_cuentas),
+            ("Balance General", self._finanzas_balance_general),
+            ("Estado de resultados", self._finanzas_estado_resultados),
+        ]
+
+        self.botones_finanzas_lateral = {}
+        for texto, cmd in botones_finanzas:
+            btn = tk.Button(frame_izq, text=texto, **btn_style)
+            btn.config(command=lambda c=cmd, t=texto: self._seleccionar_boton_finanzas(t, c))
+            btn.pack(fill="x", padx=10, pady=3)
+            self.botones_finanzas_lateral[texto] = btn
+
+        self.frame_finanzas_der = tk.Frame(paned, bg=self.COLOR_FONDO)
+        paned.add(self.frame_finanzas_der, minsize=400)
+
+        self._finanzas_mostrar_bienvenida()
+
+    def _seleccionar_boton_finanzas(self, texto_boton, comando_accion):
+        for btn in self.botones_finanzas_lateral.values():
+            btn.config(bg=self.COLOR_AZUL)
+        self.botones_finanzas_lateral[texto_boton].config(bg=self.COLOR_AZUL_CLARO)
+        comando_accion()
+
+    def _finanzas_limpiar_der(self):
+        for widget in self.frame_finanzas_der.winfo_children():
+            widget.destroy()
+
+    def _finanzas_mostrar_bienvenida(self):
+        self._finanzas_limpiar_der()
+        tk.Label(self.frame_finanzas_der, text="Bienvenido al módulo de Finanzas",
+                 font=("Arial", 16, "bold"), bg=self.COLOR_FONDO,
+                 fg=self.COLOR_AZUL).place(relx=0.5, rely=0.45, anchor="center")
+        tk.Label(self.frame_finanzas_der, text="Seleccione una opción del menú lateral",
+                 font=("Arial", 10, "italic"), bg=self.COLOR_FONDO,
+                 fg="#888888").place(relx=0.5, rely=0.52, anchor="center")
+
+    def _finanzas_proximamente(self):
+        self._finanzas_limpiar_der()
+        tk.Label(self.frame_finanzas_der, text="Funcionalidad próximamente disponible",
+                 font=("Arial", 13), bg=self.COLOR_FONDO, fg="#888888").pack(pady=80)
+
+    def _finanzas_cuentas(self):
+        self._finanzas_limpiar_der()
+
+
+        tk.Label(self.frame_finanzas_der, text="Gestión de Cuentas",
+                 font=("Arial", 14, "bold"), bg=self.COLOR_FONDO,
+                 fg=self.COLOR_AZUL).pack(pady=(15, 5))
+
+
+        frame_form_outer = tk.Frame(self.frame_finanzas_der, bg=self.COLOR_FONDO,
+                                    highlightbackground="#AAAAAA", highlightthickness=2)
+        frame_form_outer.pack(fill="x", padx=20, pady=5)
+
+
+        frame_cols = tk.Frame(frame_form_outer, bg=self.COLOR_FONDO)
+        frame_cols.pack(padx=20, pady=15, fill="x")
+        frame_cols.columnconfigure(0, weight=1)
+        frame_cols.columnconfigure(1, weight=1)
+
+
+        frame_izq = tk.Frame(frame_cols, bg=self.COLOR_FONDO)
+        frame_izq.grid(row=0, column=0, sticky="nsew", padx=(0, 20))
+
+        tk.Label(frame_izq, text="INGRESE EL NOMBRE DE LA CUENTA:",
+                 font=("Arial", 10, "bold"), bg=self.COLOR_FONDO).pack(anchor="w", pady=(0, 4))
+
+        self._entry_cuenta_nombre = tk.Entry(frame_izq, font=("Arial", 11))
+        self._entry_cuenta_nombre.pack(fill="x", ipady=4, pady=(0, 14))
+
+        tk.Label(frame_izq, text="CARACTERÍSTICAS DE LA CUENTA",
+                 font=("Arial", 10, "bold"), bg=self.COLOR_FONDO).pack(anchor="w", pady=(0, 6))
+
+        tk.Label(frame_izq, text="Estado financiero:", font=("Arial", 9, "bold"),
+                 bg=self.COLOR_FONDO).pack(anchor="w")
+
+        self._lb_estado_financiero = ttk.Combobox(frame_izq, font=("Arial", 10), width=22,
+                                                  values=["Balance general", "Estado de resultados"],
+                                                  state="readonly")
+        self._lb_estado_financiero.current(0)
+        self._lb_estado_financiero.pack(anchor="w", pady=4)
+        self._lb_estado_financiero.bind("<<ComboboxSelected>>", self._finanzas_on_estado_change)
+
+
+        self._frame_der_dinamico = tk.Frame(frame_cols, bg=self.COLOR_FONDO)
+        self._frame_der_dinamico.grid(row=0, column=1, sticky="nsew")
+
+
+        self._finanzas_render_columna_der("Balance general")
+
+
+        frame_btns = tk.Frame(self.frame_finanzas_der, bg=self.COLOR_FONDO)
+        frame_btns.pack(pady=10)
+
+        tk.Button(frame_btns, text="Guardar Cuenta", font=("Arial", 10, "bold"),
+                  bg="#28A745", fg="white", relief="flat", cursor="hand2",
+                  padx=20, pady=6, command=self._finanzas_guardar_cuenta).pack(side="left", padx=8)
+
+        tk.Button(frame_btns, text="Limpiar", font=("Arial", 10, "bold"),
+                  bg="#6C757D", fg="white", relief="flat", cursor="hand2",
+                  padx=20, pady=6, command=self._finanzas_limpiar_form_cuenta).pack(side="left", padx=8)
+
+        tk.Button(frame_btns, text="Eliminar Seleccionada", font=("Arial", 10, "bold"),
+                  bg="#DC3545", fg="white", relief="flat", cursor="hand2",
+                  padx=20, pady=6, command=self._finanzas_eliminar_cuenta).pack(side="left", padx=8)
+
+
+        tk.Label(self.frame_finanzas_der, text="Cuentas registradas",
+                 font=("Arial", 11, "bold"), bg=self.COLOR_FONDO,
+                 fg=self.COLOR_AZUL).pack(anchor="w", padx=20)
+
+        frame_tabla = tk.Frame(self.frame_finanzas_der, bg=self.COLOR_FONDO)
+        frame_tabla.pack(fill="both", expand=True, padx=20, pady=(4, 10))
+
+        sb = ttk.Scrollbar(frame_tabla)
+        sb.pack(side="right", fill="y")
+
+        cols = ("ID", "Nombre", "Tipo", "Corriente", "Estado financiero", "Valor (Q)")
+        self._tabla_cuentas = ttk.Treeview(frame_tabla, columns=cols, show="headings",
+                                           yscrollcommand=sb.set, height=8)
+        sb.config(command=self._tabla_cuentas.yview)
+
+        anchos = [0, 200, 80, 100, 150, 100]
+        for col, w in zip(cols, anchos):
+            self._tabla_cuentas.heading(col, text=col)
+            self._tabla_cuentas.column(col, width=w)
+        self._tabla_cuentas.column("ID", width=0, stretch=False)
+        self._tabla_cuentas.pack(fill="both", expand=True)
+
+        self._finanzas_cargar_tabla_cuentas()
+
+    def _finanzas_on_estado_change(self, event=None):
+        estado = self._lb_estado_financiero.get()
+        self._finanzas_render_columna_der(estado)
+
+    def _finanzas_render_columna_der(self, estado):
+
+        for w in self._frame_der_dinamico.winfo_children():
+            w.destroy()
+
+        if estado == "Balance general":
+
+            tk.Label(self._frame_der_dinamico, text="Tipo:", font=("Arial", 9, "bold"),
+                     bg=self.COLOR_FONDO).pack(anchor="w")
+            self._lb_tipo = ttk.Combobox(self._frame_der_dinamico, font=("Arial", 10), width=18,
+                                         values=["Activo", "Pasivo"], state="readonly")
+            self._lb_tipo.current(0)
+            self._lb_tipo.pack(anchor="w", pady=(4, 10))
+
+
+            tk.Label(self._frame_der_dinamico, text="Clasificación:", font=("Arial", 9, "bold"),
+                     bg=self.COLOR_FONDO).pack(anchor="w")
+            self._lb_corriente = ttk.Combobox(self._frame_der_dinamico, font=("Arial", 10), width=18,
+                                              values=["Corriente", "No corriente"], state="readonly")
+            self._lb_corriente.current(0)
+            self._lb_corriente.pack(anchor="w", pady=(4, 10))
+
+        else:
+
+            tk.Label(self._frame_der_dinamico, text="Tipo:", font=("Arial", 9, "bold"),
+                     bg=self.COLOR_FONDO).pack(anchor="w")
+            self._lb_tipo = ttk.Combobox(self._frame_der_dinamico, font=("Arial", 10), width=18,
+                                         values=["Gasto", "Ingreso"], state="readonly")
+            self._lb_tipo.current(0)
+            self._lb_tipo.pack(anchor="w", pady=(4, 10))
+
+
+            self._lb_corriente = ttk.Combobox(self._frame_der_dinamico, values=["N/A"], state="readonly")
+            self._lb_corriente.current(0)
+            self._lb_corriente.pack_forget()
+
+
+        frame_valor = tk.Frame(self._frame_der_dinamico, bg=self.COLOR_FONDO)
+        frame_valor.pack(anchor="w", pady=(6, 0))
+
+        tk.Label(frame_valor, text="Valor de la cuenta:", font=("Arial", 10, "bold"),
+                 bg=self.COLOR_FONDO).pack(side="left", padx=(0, 6))
+        tk.Label(frame_valor, text="Q.", font=("Arial", 10, "bold"),
+                 bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(side="left")
+
+
+        valor_prev = "0.00"
+        if hasattr(self, "_entry_cuenta_valor"):
+            try:
+                valor_prev = self._entry_cuenta_valor.get().strip() or "0.00"
+            except Exception:
+                valor_prev = "0.00"
+
+        self._entry_cuenta_valor = tk.Entry(frame_valor, font=("Arial", 11), width=18)
+        self._entry_cuenta_valor.pack(side="left", ipady=4)
+        self._entry_cuenta_valor.insert(0, valor_prev)
+
+    def _finanzas_guardar_cuenta(self):
+        nombre = self._entry_cuenta_nombre.get().strip()
+        if not nombre:
+            messagebox.showerror("Error", "Ingrese el nombre de la cuenta.")
+            return
+
+        estado_financiero = self._lb_estado_financiero.get()
+        tipo = self._lb_tipo.get()
+        corriente = self._lb_corriente.get() if estado_financiero == "Balance general" else "N/A"
+
+        if not estado_financiero or not tipo:
+            messagebox.showerror("Error", "Seleccione el estado financiero y el tipo de cuenta.")
+            return
+
+        try:
+            valor = float(self._entry_cuenta_valor.get().strip())
+        except ValueError:
+            messagebox.showerror("Error", "El valor debe ser un número válido.")
+            return
+
+        if CuentasDB.agregar(nombre, tipo, corriente, estado_financiero, valor):
+            self._finanzas_limpiar_form_cuenta()
+            self._finanzas_cargar_tabla_cuentas()
+            messagebox.showinfo("Éxito", f"Cuenta '{nombre}' guardada correctamente.")
+        else:
+            messagebox.showerror("Error", "No se pudo guardar la cuenta.")
+
+    def _finanzas_limpiar_form_cuenta(self):
+        self._entry_cuenta_nombre.delete(0, "end")
+        self._entry_cuenta_valor.delete(0, "end")
+        self._entry_cuenta_valor.insert(0, "0.00")
+        self._lb_estado_financiero.current(0)
+        self._finanzas_render_columna_der("Balance general")
+
+    def _finanzas_cargar_tabla_cuentas(self):
+        if not hasattr(self, '_tabla_cuentas'):
+            return
+        for item in self._tabla_cuentas.get_children():
+            self._tabla_cuentas.delete(item)
+        for c in CuentasDB.obtener_todas():
+            self._tabla_cuentas.insert("", "end", values=(
+                c["id"], c["nombre"], c["tipo"], c["corriente"], c["estado_financiero"], f"{c['valor']:.2f}"
+            ))
+
+    def _finanzas_eliminar_cuenta(self):
+        if not hasattr(self, '_tabla_cuentas'):
+            return
+        sel = self._tabla_cuentas.selection()
+        if not sel:
+            messagebox.showwarning("Advertencia", "Seleccione una cuenta para eliminar.")
+            return
+        vals = self._tabla_cuentas.item(sel[0])["values"]
+        if messagebox.askyesno("Confirmar", f"¿Eliminar la cuenta '{vals[1]}'?"):
+            if CuentasDB.eliminar(vals[0]):
+                self._finanzas_cargar_tabla_cuentas()
+                messagebox.showinfo("Éxito", "Cuenta eliminada correctamente.")
+            else:
+                messagebox.showerror("Error", "No se pudo eliminar la cuenta.")
+
+
+    def _finanzas_balance_general(self):
+        self._finanzas_limpiar_der()
+
+        COLOR = self.COLOR_FONDO
+        AZUL  = self.COLOR_AZUL
+
+
+        tk.Label(self.frame_finanzas_der, text="Balance de Situación General",
+                 font=("Arial", 13, "bold"), bg=COLOR, fg=AZUL).pack(pady=(14, 0))
+        fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+        tk.Label(self.frame_finanzas_der, text=f"fecha: {fecha_hoy}",
+                 font=("Arial", 10, "italic"), bg=COLOR).pack(pady=(0, 8))
+
+
+        frame_wrap = tk.Frame(self.frame_finanzas_der, bg=COLOR)
+        frame_wrap.pack(fill="both", expand=True, padx=20)
+
+        canvas = tk.Canvas(frame_wrap, bg=COLOR, highlightthickness=0)
+        sb = ttk.Scrollbar(frame_wrap, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        frame_rpt = tk.Frame(canvas, bg=COLOR)
+        win_id = canvas.create_window((0, 0), window=frame_rpt, anchor="nw")
+
+        def _on_resize(event):
+            canvas.itemconfig(win_id, width=event.width)
+        canvas.bind("<Configure>", _on_resize)
+        frame_rpt.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+
+        cuentas = CuentasDB.obtener_todas()
+        bg = COLOR
+
+
+        COL_SUBTOTAL = "#E8F0FB"
+        COL_TOTAL    = "#D0E4FF"
+
+        def fila(parent, nombre, valor_izq=None, valor_der=None,
+                 bold=False, underline=False, bg_color=None, indent=0):
+            f = tk.Frame(parent, bg=bg_color or bg)
+            f.pack(fill="x", pady=0)
+            style = "bold" if bold else ""
+            font_n = ("Arial", 9, style) if not underline else ("Arial", 9, "bold underline")
+            pad_left = 8 + indent * 20
+            tk.Label(f, text=nombre, font=font_n, bg=bg_color or bg,
+                     anchor="w").place(x=pad_left, y=2)
+            if valor_izq is not None:
+                tk.Label(f, text=f"Q  {valor_izq:,.2f}", font=("Arial", 9), bg=bg_color or bg,
+                         anchor="e").place(relx=0.70, y=2, anchor="ne")
+            if valor_der is not None:
+                tk.Label(f, text=f"Q  {valor_der:,.2f}", font=("Arial", 9, "bold"), bg=bg_color or bg,
+                         anchor="e").place(relx=0.99, y=2, anchor="ne")
+            tk.Frame(f, bg=bg_color or bg, height=20).pack()
+
+        def separador(parent):
+            tk.Frame(parent, bg="#AAAAAA", height=1).pack(fill="x", padx=4, pady=1)
+
+
+        tk.Label(frame_rpt, text="ACTIVO", font=("Arial", 10, "bold underline"),
+                 bg=bg).pack(anchor="center", pady=(6, 2))
+
+        activos = [c for c in cuentas if c["tipo"] == "Activo"]
+        corrientes_a  = [c for c in activos if c["corriente"] == "Corriente"]
+        no_corr_a     = [c for c in activos if c["corriente"] == "No corriente"]
+
+        suma_corr_a = sum(c["valor"] for c in corrientes_a)
+        suma_no_corr_a = sum(c["valor"] for c in no_corr_a)
+        suma_activo = suma_corr_a + suma_no_corr_a
+
+        fila(frame_rpt, "Corriente", bold=True, underline=True)
+        for c in corrientes_a:
+            fila(frame_rpt, c["nombre"], valor_izq=c["valor"], indent=1)
+        fila(frame_rpt, "", valor_der=suma_corr_a, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+        fila(frame_rpt, "No Corriente", bold=True, underline=True)
+        for c in no_corr_a:
+            fila(frame_rpt, c["nombre"], valor_izq=c["valor"], indent=1)
+        fila(frame_rpt, "", valor_der=suma_no_corr_a, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+        fila(frame_rpt, "Suma del Activo", valor_der=suma_activo, bold=True, bg_color=COL_TOTAL)
+        separador(frame_rpt)
+
+
+        tk.Label(frame_rpt, text="PATRIMONIO NETO Y PASIVO",
+                 font=("Arial", 10, "bold underline"), bg=bg).pack(anchor="center", pady=(8, 2))
+        tk.Label(frame_rpt, text="PASIVO", font=("Arial", 10, "bold underline"),
+                 bg=bg).pack(anchor="center", pady=(0, 2))
+
+        pasivos = [c for c in cuentas if c["tipo"] == "Pasivo"]
+        corrientes_p  = [c for c in pasivos if c["corriente"] == "Corriente"]
+        no_corr_p     = [c for c in pasivos if c["corriente"] == "No corriente"]
+
+        suma_corr_p   = sum(c["valor"] for c in corrientes_p)
+        suma_no_corr_p = sum(c["valor"] for c in no_corr_p)
+        suma_pasivo   = suma_corr_p + suma_no_corr_p
+
+        fila(frame_rpt, "Corriente", bold=True, underline=True)
+        for c in corrientes_p:
+            fila(frame_rpt, c["nombre"], valor_izq=c["valor"], indent=1)
+        fila(frame_rpt, "", valor_der=suma_corr_p, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+        fila(frame_rpt, "No Corriente", bold=True, underline=True)
+        for c in no_corr_p:
+            fila(frame_rpt, c["nombre"], valor_izq=c["valor"], indent=1)
+        fila(frame_rpt, "", valor_der=suma_no_corr_p, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+
+        patrimonio = suma_activo - suma_pasivo
+        tk.Label(frame_rpt, text="PATRIMONIO NETO", font=("Arial", 10, "bold underline"),
+                 bg=bg).pack(anchor="center", pady=(6, 2))
+        fila(frame_rpt, "Capital", valor_der=patrimonio, indent=1)
+        separador(frame_rpt)
+
+        suma_pasivo_patrimonio = suma_pasivo + patrimonio
+        fila(frame_rpt, "Suma del Pasivo y Patrimonio Neto",
+             valor_der=suma_pasivo_patrimonio, bold=True, bg_color=COL_TOTAL)
+
+    def _finanzas_estado_resultados(self):
+        self._finanzas_limpiar_der()
+
+        COLOR = self.COLOR_FONDO
+        AZUL  = self.COLOR_AZUL
+
+
+        tk.Label(self.frame_finanzas_der, text="Estado de Resultados",
+                 font=("Arial", 13, "bold"), bg=COLOR, fg=AZUL).pack(pady=(14, 8))
+
+
+        frame_wrap = tk.Frame(self.frame_finanzas_der, bg=COLOR)
+        frame_wrap.pack(fill="both", expand=True, padx=20)
+
+        canvas = tk.Canvas(frame_wrap, bg=COLOR, highlightthickness=0)
+        sb = ttk.Scrollbar(frame_wrap, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        frame_rpt = tk.Frame(canvas, bg=COLOR)
+        win_id = canvas.create_window((0, 0), window=frame_rpt, anchor="nw")
+
+        def _on_resize(event):
+            canvas.itemconfig(win_id, width=event.width)
+        canvas.bind("<Configure>", _on_resize)
+        frame_rpt.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        bg = COLOR
+        COL_SUBTOTAL = "#E8F0FB"
+        COL_TOTAL    = "#D0E4FF"
+        COL_NEG      = "#FDE8E8"
+
+        def fila(parent, nombre, valor_izq=None, valor_der=None,
+                 bold=False, underline=False, bg_color=None, indent=0):
+            f = tk.Frame(parent, bg=bg_color or bg)
+            f.pack(fill="x", pady=0)
+            style = "bold" if bold else ""
+            font_n = ("Arial", 9, style) if not underline else ("Arial", 9, "bold underline")
+            pad_left = 8 + indent * 20
+            tk.Label(f, text=nombre, font=font_n, bg=bg_color or bg,
+                     anchor="w").place(x=pad_left, y=2)
+            if valor_izq is not None:
+                tk.Label(f, text=f"Q  {valor_izq:,.2f}", font=("Arial", 9), bg=bg_color or bg,
+                         anchor="e").place(relx=0.70, y=2, anchor="ne")
+            if valor_der is not None:
+                tk.Label(f, text=f"Q  {valor_der:,.2f}", font=("Arial", 9, "bold"), bg=bg_color or bg,
+                         anchor="e").place(relx=0.99, y=2, anchor="ne")
+            tk.Frame(f, bg=bg_color or bg, height=20).pack()
+
+        def separador(parent):
+            tk.Frame(parent, bg="#AAAAAA", height=1).pack(fill="x", padx=4, pady=1)
+
+        cuentas = CuentasDB.obtener_todas()
+        er = [c for c in cuentas if c["estado_financiero"] == "Estado de resultados"]
+        gastos   = [c for c in er if c["tipo"] == "Gasto"]
+        ingresos_er = [c for c in er if c["tipo"] == "Ingreso"]
+
+
+        tk.Label(frame_rpt, text="Ingresos", font=("Arial", 10, "bold underline"),
+                 bg=bg).pack(anchor="center", pady=(6, 2))
+
+        ventas          = 900000.00
+        devoluciones    = 3914.00
+        utilidad_neta   = ventas - devoluciones
+
+        fila(frame_rpt, "Ventas",                                valor_der=ventas)
+        fila(frame_rpt, "(-) Devoluciones y Rebajas sobre Ventas", valor_der=devoluciones)
+        fila(frame_rpt, "Utilidad Neta",                         valor_der=utilidad_neta, bold=True, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+
+        tk.Label(frame_rpt, text="Gastos", font=("Arial", 10, "bold underline"),
+                 bg=bg).pack(anchor="center", pady=(6, 2))
+
+        suma_gastos = sum(c["valor"] for c in gastos)
+        for c in gastos:
+            fila(frame_rpt, c["nombre"], valor_izq=c["valor"], indent=1)
+        fila(frame_rpt, "Total de Gastos", valor_der=suma_gastos, bold=True, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+        resultado_operacion = utilidad_neta - suma_gastos
+        fila(frame_rpt, "Resultado de Operación", valor_der=resultado_operacion, bold=True, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+
+        tk.Label(frame_rpt, text="Otros Ingresos", font=("Arial", 10, "bold underline"),
+                 bg=bg).pack(anchor="center", pady=(6, 2))
+
+        suma_otros_ing = sum(c["valor"] for c in ingresos_er)
+        for c in ingresos_er:
+            fila(frame_rpt, c["nombre"], valor_izq=c["valor"], indent=1)
+        fila(frame_rpt, "", valor_der=suma_otros_ing, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+        diferencia_positiva = resultado_operacion + suma_otros_ing
+        fila(frame_rpt, "Diferencia Positiva", valor_der=diferencia_positiva, bold=True, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+
+        tk.Label(frame_rpt, text="Otros Gastos", font=("Arial", 10, "bold underline"),
+                 bg=bg).pack(anchor="center", pady=(6, 2))
+
+        otros_gastos = 0.0
+        fila(frame_rpt, "", valor_der=otros_gastos, bg_color=COL_SUBTOTAL)
+        separador(frame_rpt)
+
+        ganancia_antes = diferencia_positiva - otros_gastos
+        isr = ganancia_antes * 0.25
+        ganancia_despues = ganancia_antes - isr
+
+        fila(frame_rpt, "Ganancia Antes del Impuesto",            valor_der=ganancia_antes,   bold=True, bg_color=COL_SUBTOTAL)
+        fila(frame_rpt, "(-) ISR por Pagar (25% sobre ganancia)", valor_der=isr,              bg_color=COL_NEG)
+        fila(frame_rpt, "Ganancia Después del Impuesto y Reserva",valor_der=ganancia_despues, bold=True, bg_color=COL_TOTAL)
 
 
 class VentanaAgregarCategoria:
