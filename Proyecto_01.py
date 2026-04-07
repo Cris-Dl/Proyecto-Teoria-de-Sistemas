@@ -6,15 +6,12 @@ import sqlite3
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
-
 class TablasDB:
     DB_NAME = "geos_inventario.db"
-
     @staticmethod
     def _conn():
         conn = sqlite3.connect(TablasDB.DB_NAME)
         conn.row_factory = sqlite3.Row
-
         conn.execute("""
             CREATE TABLE IF NOT EXISTS proveedores (
                 id_num INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,12 +61,10 @@ class TablasDB:
             );
         """)
 
-        # Intentar añadir la columna sueldo_base si la tabla ya existía antes de esta actualización
         try:
             conn.execute("ALTER TABLE colaboradores ADD COLUMN sueldo_base REAL")
         except sqlite3.OperationalError:
             pass
-
         conn.execute("""
             CREATE TABLE IF NOT EXISTS ventas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +74,6 @@ class TablasDB:
         """)
         conn.commit()
         return conn
-
 
 class CategoriasDB:
     @staticmethod
@@ -115,7 +109,6 @@ class CategoriasDB:
         finally:
             conn.close()
 
-
 class ProductosDB:
     @staticmethod
     def obtener_todos():
@@ -143,10 +136,7 @@ class ProductosDB:
         conn = TablasDB._conn()
         try:
             conn.execute(
-                """INSERT INTO productos (nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor)
-            )
+                """INSERT INTO productos (nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor) VALUES (?, ?, ?, ?, ?, ?, ?)""",(nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor))
             conn.commit()
             return True
         except sqlite3.IntegrityError:
@@ -159,10 +149,7 @@ class ProductosDB:
         conn = TablasDB._conn()
         try:
             cursor = conn.execute(
-                """UPDATE productos SET nombre = ?, codigo = ?, precio_compra = ?, precio_venta = ?, 
-                   categoria = ?, cantidad = ?, proveedor = ? WHERE id_num = ?""",
-                (nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor, id_num)
-            )
+                """UPDATE productos SET nombre = ?, codigo = ?, precio_compra = ?, precio_venta = ?, categoria = ?, cantidad = ?, proveedor = ? WHERE id_num = ?""",(nombre, codigo, precio_compra, precio_venta, categoria, cantidad, proveedor, id_num))
             conn.commit()
             return cursor.rowcount > 0
         finally:
@@ -196,7 +183,6 @@ class ProductosDB:
             return cursor.rowcount > 0
         finally:
             conn.close()
-
 
 class ProveedoresDB:
     @staticmethod
@@ -1317,7 +1303,7 @@ class SistemaGEOS:
             ("Generar Puesto", self._rrhh_generar_puesto),
             ("Asignar puesto a colaborador", self._rrhh_asignar_puesto),
             ("Generar credenciales para empleado", self._rrhh_generar_credenciales),
-            ("Nómina", self._rrhh_proximamente),
+            ("Nómina", self._rrhh_nomina),
             ("Eliminar colaborador", self._rrhh_eliminar_colaborador),
         ]
 
@@ -1361,7 +1347,8 @@ class SistemaGEOS:
 
             self._foto_rrhh = ImageTk.PhotoImage(img_pil)
 
-            frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA",highlightbackground="#CCCCCC", highlightthickness=1,width=img_ancho, height=img_alto)
+            frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA", highlightbackground="#CCCCCC", highlightthickness=1,
+                                 width=img_ancho, height=img_alto)
             frame_img.place(relx=0.5, rely=0.5, anchor="center")
             frame_img.pack_propagate(False)
 
@@ -1374,7 +1361,8 @@ class SistemaGEOS:
                 img_ancho = self._foto_rrhh.width()
                 img_alto = self._foto_rrhh.height()
 
-                frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA",highlightbackground="#CCCCCC", highlightthickness=1,width=img_ancho, height=img_alto)
+                frame_img = tk.Frame(self.frame_rrhh_der, bg="#F0F4FA", highlightbackground="#CCCCCC",
+                                     highlightthickness=1, width=img_ancho, height=img_alto)
                 frame_img.place(relx=0.5, rely=0.5, anchor="center")
                 frame_img.pack_propagate(False)
 
@@ -1382,14 +1370,90 @@ class SistemaGEOS:
                 lbl_img.place(relx=0.5, rely=0.5, anchor="center")
 
             except Exception:
-                tk.Label(self.frame_rrhh_der, text="[ Imagen RRHH ]", font=("Arial", 18),bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+                tk.Label(self.frame_rrhh_der, text="[ Imagen RRHH ]", font=("Arial", 18), bg="#F0F4FA",
+                         fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
         except Exception:
-            tk.Label(self.frame_rrhh_der, text="[ Imagen RRHH ]", font=("Arial", 18),bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+            tk.Label(self.frame_rrhh_der, text="[ Imagen RRHH ]", font=("Arial", 18), bg="#F0F4FA", fg="#AAAAAA").place(
+                relx=0.5, rely=0.5, anchor="center")
 
-    def _rrhh_proximamente(self):
+    def _rrhh_nomina(self):
         self._rrhh_limpiar_der()
-        tk.Label(self.frame_rrhh_der, text="Funcionalidad próximamente disponible",
-                 font=("Arial", 13), bg=self.COLOR_FONDO, fg="#888888").pack(pady=80)
+
+        tk.Label(self.frame_rrhh_der, text="GEOS Herramientas y Equipos",
+                 font=("Arial", 14, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(20, 5))
+
+        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre",
+                 "Noviembre", "Diciembre"]
+        mes_actual = f"{meses[datetime.now().month - 1]} de {datetime.now().year}"
+
+        tk.Label(self.frame_rrhh_der, text=f"Nómina de {mes_actual}",
+                 font=("Arial", 11, "italic"), bg=self.COLOR_FONDO, fg="#666666").pack(anchor="w", padx=30, pady=5)
+
+        frame_tabla = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
+        frame_tabla.pack(fill="both", expand=True, padx=20, pady=10)
+
+        sb = ttk.Scrollbar(frame_tabla)
+        sb.pack(side="right", fill="y")
+
+        cols = ("Empleado", "Puesto", "Salario Bruto", "IGSS (4.83%)", "Cuota Patronal (12.67%)", "Anticipos", "Total")
+
+        style = ttk.Style()
+        style.configure("Nomina.Treeview", background="white", fieldbackground="white", rowheight=30)
+
+        self._tabla_nomina = ttk.Treeview(frame_tabla, columns=cols, show="headings",
+                                          yscrollcommand=sb.set, height=18, style="Nomina.Treeview")
+        sb.config(command=self._tabla_nomina.yview)
+
+        anchos = [160, 120, 100, 100, 150, 100, 100]
+        for col, w in zip(cols, anchos):
+            self._tabla_nomina.heading(col, text=col)
+            self._tabla_nomina.column(col, width=w, anchor="center")
+
+        self._tabla_nomina.column("Empleado", anchor="w")
+        self._tabla_nomina.pack(fill="both", expand=True)
+
+        self._tabla_nomina.tag_configure('oddrow', background='#F8D7E3')
+        self._tabla_nomina.tag_configure('evenrow', background='#FFFFFF')
+
+        empleados = ColaboradoresDB.obtener_con_puesto()
+
+        fila_idx = 0
+        for emp in empleados:
+            if not emp.get("usuario"):
+                continue
+
+            try:
+                sueldo_base = float(emp.get("sueldo_base", 0.0) or 0.0)
+            except ValueError:
+                sueldo_base = 0.0
+
+            if sueldo_base <= 0:
+                continue
+
+            igss = sueldo_base * 0.0483
+            cuota_patronal = sueldo_base * 0.1267
+            anticipos = 0.0
+
+            total = sueldo_base - igss - anticipos
+
+            nombre_completo = f"{emp['nombre']} {emp['apellidos']}"
+
+            tag = 'evenrow' if fila_idx % 2 == 0 else 'oddrow'
+
+            self._tabla_nomina.insert("", "end", values=(
+                nombre_completo,
+                emp["puesto"],
+                f"Q{sueldo_base:,.2f}",
+                f"Q{igss:,.2f}",
+                f"Q{cuota_patronal:,.2f}",
+                f"Q{anticipos:,.2f}",
+                f"Q{total:,.2f}"
+            ), tags=(tag,))
+
+            fila_idx += 1
+
+        tk.Button(self.frame_rrhh_der, text="Imprimir Nómina", font=("Arial", 11, "bold"),
+                  bg=self.COLOR_AZUL, fg="white", relief="flat", cursor="hand2", padx=25, pady=8).pack(pady=10)
 
     def _rrhh_contratar(self):
         self._rrhh_limpiar_der()
@@ -1409,33 +1473,43 @@ class SistemaGEOS:
         canvas_scroll.bind("<Configure>", _on_resize)
         inner.bind("<Configure>", lambda e: canvas_scroll.configure(scrollregion=canvas_scroll.bbox("all")))
 
-        tk.Label(inner, text="Ingresar Postulante", font=("Arial", 15, "bold"),bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(20, 10))
+        tk.Label(inner, text="Ingresar Postulante", font=("Arial", 15, "bold"),
+                 bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(20, 10))
 
         frame_form = tk.Frame(inner, bg=self.COLOR_FONDO)
         frame_form.pack(padx=60, pady=5, fill="x")
         frame_form.columnconfigure(1, weight=1)
 
-        # Volvemos a quitar Sueldo Base de aquí
         campos_labels = ["Nombre:", "Apellidos:", "DPI:", "Edad:", "Dirección:", "Teléfono:"]
         self._rrhh_entries = {}
         for i, label in enumerate(campos_labels):
-            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"),bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=i, column=0, sticky="e", pady=7, padx=5)
+            tk.Label(frame_form, text=label, font=("Arial", 10, "bold"),
+                     bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=i, column=0, sticky="e", pady=7, padx=5)
             entry = tk.Entry(frame_form, font=("Arial", 10), width=35)
             entry.grid(row=i, column=1, sticky="ew", pady=7, padx=5)
             self._rrhh_entries[label] = entry
 
-        tk.Label(frame_form, text="Importar CV:", font=("Arial", 10, "bold"),bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=6, column=0, sticky="e", pady=7, padx=5)
+        tk.Label(frame_form, text="Importar CV:", font=("Arial", 10, "bold"),
+                 bg=self.COLOR_FONDO, anchor="e", width=12).grid(row=6, column=0, sticky="e", pady=7, padx=5)
         frame_cv = tk.Frame(frame_form, bg=self.COLOR_FONDO)
         frame_cv.grid(row=6, column=1, sticky="ew", pady=7, padx=5)
         self._rrhh_cv_path = tk.StringVar(value="")
-        self._lbl_cv = tk.Label(frame_cv, text="Ningún archivo seleccionado",font=("Arial", 9), bg=self.COLOR_FONDO, fg="#666666")
+        self._lbl_cv = tk.Label(frame_cv, text="Ningún archivo seleccionado",
+                                font=("Arial", 9), bg=self.COLOR_FONDO, fg="#666666")
         self._lbl_cv.pack(side="left", padx=(0, 10))
-        tk.Button(frame_cv, text="Seleccionar PDF", font=("Arial", 9, "bold"),bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,cursor="hand2", padx=8, pady=3,command=self._rrhh_seleccionar_cv).pack(side="left")
+        tk.Button(frame_cv, text="Seleccionar PDF", font=("Arial", 9, "bold"),
+                  bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,
+                  cursor="hand2", padx=8, pady=3,
+                  command=self._rrhh_seleccionar_cv).pack(side="left")
 
         frame_btns = tk.Frame(inner, bg=self.COLOR_FONDO)
         frame_btns.pack(pady=20)
-        tk.Button(frame_btns, text="Confirmar", font=("Arial", 11, "bold"),bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,command=self._rrhh_confirmar_contratacion).pack(side="left", padx=10)
-        tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,command=self._rrhh_limpiar_contratacion).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="Confirmar", font=("Arial", 11, "bold"),
+                  bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,
+                  command=self._rrhh_confirmar_contratacion).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),
+                  bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=30, pady=8,
+                  command=self._rrhh_limpiar_contratacion).pack(side="left", padx=10)
 
     def _rrhh_seleccionar_cv(self):
         from tkinter import filedialog
@@ -1468,7 +1542,6 @@ class SistemaGEOS:
             return
 
         cv_path = self._rrhh_cv_path.get()
-        # Se elimina el sueldo base de la insercion inicial
         if ColaboradoresDB.agregar(vals["Nombre:"], vals["Apellidos:"], vals["DPI:"],
                                    vals["Edad:"], vals["Dirección:"], vals["Teléfono:"], cv_path):
             self._rrhh_limpiar_contratacion()
@@ -1497,7 +1570,7 @@ class SistemaGEOS:
         for col, w in zip(cols, anchos):
             self._tabla_postulantes.heading(col, text=col)
             self._tabla_postulantes.column(col, width=w)
-        self._tabla_postulantes.column("ID", width=0, stretch=False)  # hide ID
+        self._tabla_postulantes.column("ID", width=0, stretch=False)
         self._tabla_postulantes.pack(fill="both", expand=True)
         self._tabla_postulantes.bind("<Double-1>", self._rrhh_ver_cv_postulante)
         self._cargar_postulantes()
@@ -1561,7 +1634,6 @@ class SistemaGEOS:
                   bg="#28A745", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
                   command=self._rrhh_guardar_puesto).pack(pady=15)
 
-        # List of existing posts
         tk.Label(outer, text="Puestos creados:", font=("Arial", 10, "bold"),
                  bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(pady=(10, 2))
         self._lista_puestos = tk.Listbox(outer, font=("Arial", 10), width=40, height=8,
@@ -1678,7 +1750,6 @@ class SistemaGEOS:
         frame_datos = tk.Frame(vent, bg="#FFFFFF")
         frame_datos.pack(padx=30, pady=5, fill="x")
 
-        # Al momento de asignar, mostramos solo los datos y pediremos el sueldo más abajo
         datos_mostrar = [
             ("Nombre:", col_data["nombre"]),
             ("Apellidos:", col_data["apellidos"]),
@@ -1713,7 +1784,6 @@ class SistemaGEOS:
         entry_codigo = tk.Entry(frame_asig, font=("Arial", 10), width=24)
         entry_codigo.grid(row=1, column=1, sticky="ew", pady=8, padx=5)
 
-        # Novedad: Agregamos el campo Sueldo Base a la hora de asignar puesto
         tk.Label(frame_asig, text="Sueldo Base (Q):", font=("Arial", 10, "bold"),
                  bg="#FFFFFF", anchor="e", width=18).grid(row=2, column=0, sticky="e", pady=8, padx=5)
         entry_sueldo = tk.Entry(frame_asig, font=("Arial", 10), width=24)
@@ -1871,7 +1941,7 @@ class SistemaGEOS:
         tk.Label(self.frame_rrhh_der, text="Eliminar Colaborador",
                  font=("Arial", 14, "bold"), bg=self.COLOR_FONDO, fg="#DC3545").pack(pady=(15, 5))
         tk.Label(self.frame_rrhh_der,
-                 text="Seleccione un colaborador y presione Eliminar.",
+                 text="Seleccione un colaborador y presione Eliminar (o doble clic).",
                  font=("Arial", 9, "italic"), bg=self.COLOR_FONDO, fg="#666666").pack()
 
         frame_tabla = tk.Frame(self.frame_rrhh_der, bg=self.COLOR_FONDO)
@@ -1890,6 +1960,8 @@ class SistemaGEOS:
         self._tabla_elim.column("ID", width=0, stretch=False)
         self._tabla_elim.pack(fill="both", expand=True)
 
+        self._tabla_elim.bind("<Double-1>", self._click_eliminar_colaborador)
+
         for col in ColaboradoresDB.obtener_todos():
             self._tabla_elim.insert("", "end", values=(
                 col["id"], col["codigo"], col["nombre"], col["apellidos"], col["dpi"], col["puesto"]
@@ -1898,21 +1970,106 @@ class SistemaGEOS:
         tk.Button(self.frame_rrhh_der, text="Eliminar Seleccionado",
                   font=("Arial", 11, "bold"), bg="#DC3545", fg="white",
                   relief="flat", cursor="hand2", padx=25, pady=8,
-                  command=self._confirmar_eliminar_colaborador).pack(pady=10)
+                  command=self._click_eliminar_colaborador).pack(pady=10)
 
-    def _confirmar_eliminar_colaborador(self):
-        if not hasattr(self, '_tabla_elim'):
-            return
+    def _click_eliminar_colaborador(self, event=None):
+        if not hasattr(self, '_tabla_elim'): return
+        if event and not self._tabla_elim.identify_row(event.y): return
+
         sel = self._tabla_elim.selection()
         if not sel:
             messagebox.showwarning("Advertencia", "Seleccione un colaborador para eliminar.")
             return
         vals = self._tabla_elim.item(sel[0])["values"]
+        self._abrir_ventana_eliminar(vals, sel[0])
+
+    def _abrir_ventana_eliminar(self, vals, item_id):
+        vent = tk.Toplevel(self.root)
+        vent.title("Eliminar Colaborador")
+        vent.configure(bg="#FFFFFF")
+        vent.transient(self.root)
+        vent.grab_set()
+        vent.update_idletasks()
+        w, h = 450, 400
+        x = (vent.winfo_screenwidth() // 2) - (w // 2)
+        y = (vent.winfo_screenheight() // 2) - (h // 2)
+        vent.geometry(f"{w}x{h}+{x}+{y}")
+
+        tk.Label(vent, text="Desvincular Colaborador", font=("Arial", 14, "bold"),
+                 bg="#FFFFFF", fg="#DC3545").pack(pady=(15, 5))
+
         nombre_completo = f"{vals[2]} {vals[3]}"
-        respuesta = messagebox.askyesno("Confirmar", f"¿Eliminar al colaborador '{nombre_completo}'?")
-        if respuesta and ColaboradoresDB.eliminar(vals[0]):
-            self._tabla_elim.delete(sel[0])
-            messagebox.showinfo("Éxito", "Colaborador eliminado correctamente.")
+        tk.Label(vent, text=f"Empleado: {nombre_completo}", font=("Arial", 11, "bold"), bg="#FFFFFF").pack(pady=5)
+        tk.Label(vent, text=f"DPI: {vals[4]} | Puesto: {vals[5]}", font=("Arial", 10), bg="#FFFFFF", fg="#666666").pack(
+            pady=5)
+
+        tk.Frame(vent, bg="#CCCCCC", height=1).pack(fill="x", padx=20, pady=10)
+
+        # Sección para el PDF de la carta de renuncia o despido
+        frame_cv = tk.Frame(vent, bg="#FFFFFF")
+        frame_cv.pack(pady=10)
+
+        tk.Label(frame_cv, text="Carta de renuncia/despido (PDF):", font=("Arial", 10, "bold"), bg="#FFFFFF").pack(
+            anchor="center")
+
+        frame_btn_pdf = tk.Frame(frame_cv, bg="#FFFFFF")
+        frame_btn_pdf.pack(pady=8)
+
+        ruta_pdf = tk.StringVar(value="")
+        lbl_pdf = tk.Label(frame_btn_pdf, text="Ningún archivo seleccionado", font=("Arial", 9), bg="#FFFFFF",
+                           fg="#666666")
+        lbl_pdf.pack(side="left", padx=(0, 10))
+
+        def seleccionar_pdf():
+            from tkinter import filedialog
+            ruta = filedialog.askopenfilename(
+                title="Seleccionar Documento PDF",
+                filetypes=[("Archivos PDF", "*.pdf")]
+            )
+            if ruta:
+                ruta_pdf.set(ruta)
+                nombre_corto = os.path.basename(ruta)
+                if len(nombre_corto) > 30:
+                    nombre_corto = nombre_corto[:27] + "..."
+                lbl_pdf.config(text=nombre_corto, fg="#333333")
+
+        tk.Button(frame_btn_pdf, text="Adjuntar PDF", font=("Arial", 9, "bold"),
+                  bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,
+                  cursor="hand2", padx=8, pady=3, command=seleccionar_pdf).pack(side="left")
+
+        # Código de seguridad
+        frame_sec = tk.Frame(vent, bg="#FFFFFF")
+        frame_sec.pack(pady=15)
+        tk.Label(frame_sec, text="Código de seguridad:", font=("Arial", 10, "bold"), bg="#FFFFFF").pack(side="left",
+                                                                                                        padx=5)
+        entry_codigo = tk.Entry(frame_sec, font=("Arial", 10), show="*", width=15)
+        entry_codigo.pack(side="left", padx=5)
+
+        # Botones
+        frame_btns = tk.Frame(vent, bg="#FFFFFF")
+        frame_btns.pack(pady=20)
+
+        def confirmar():
+            if not ruta_pdf.get():
+                messagebox.showerror("Error", "Debe adjuntar la carta (PDF).", parent=vent)
+                return
+            if entry_codigo.get() != "admin123":
+                messagebox.showerror("Error", "Código de seguridad incorrecto.", parent=vent)
+                return
+
+            if ColaboradoresDB.eliminar(vals[0]):
+                self._tabla_elim.delete(item_id)
+                messagebox.showinfo("Éxito", "Colaborador eliminado correctamente.", parent=vent)
+                vent.destroy()
+            else:
+                messagebox.showerror("Error", "No se pudo eliminar el colaborador.", parent=vent)
+
+        tk.Button(frame_btns, text="Eliminar", font=("Arial", 11, "bold"),
+                  bg="#DC3545", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
+                  command=confirmar).pack(side="left", padx=10)
+        tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),
+                  bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
+                  command=vent.destroy).pack(side="left", padx=10)
 
 
 class VentanaAgregarCategoria:
