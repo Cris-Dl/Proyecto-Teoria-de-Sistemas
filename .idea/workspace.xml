@@ -4,7 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="Imagen RRHH">
+    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="excel">
+      <change afterPath="$PROJECT_DIR$/Bienvenida.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Proyecto_01.py" beforeDir="false" afterPath="$PROJECT_DIR$/Proyecto_01.py" afterDir="false" />
     </list>
@@ -53,19 +54,19 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.Proyecto_01.executor": "Run",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "interfaz__grafica",
-    "last_opened_file_path": "C:/Users/maykm/OneDrive/Escritorio/Universidad/Proyecto-Teoria-de-Sistemas",
-    "settings.editor.selected.configurable": "configurable.group.python.group.settings"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.Proyecto_01.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;interfaz__grafica&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/maykm/OneDrive/Escritorio/Universidad/Proyecto-Teoria-de-Sistemas&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;configurable.group.python.group.settings&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\maykm\OneDrive\Escritorio\Universidad\Proyecto-Teoria-de-Sistemas" />
@@ -143,7 +144,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772581096527</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="excel">
+      <option name="closed" value="true" />
+      <created>1778006798956</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1778006798957</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -174,6 +183,7 @@
     <MESSAGE value="agregado del logo de la empresa" />
     <MESSAGE value="Agregado de proveedores, aactualización de información del inventario" />
     <MESSAGE value="Imagen RRHH" />
-    <option name="LAST_COMMIT_MESSAGE" value="Imagen RRHH" />
+    <MESSAGE value="excel" />
+    <option name="LAST_COMMIT_MESSAGE" value="excel" />
   </component>
 </project>

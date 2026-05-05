@@ -1,14 +1,13 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 from datetime import datetime, timedelta
-import os
 import sqlite3
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from openpyxl import Workbook
 from openpyxl.styles import Font
+from PIL import Image, ImageTk
 import os
-from datetime import datetime
 
 class TablasDB:
     DB_NAME = "geos_inventario.db"
@@ -843,7 +842,29 @@ class SistemaGEOS:
         self.frame_contenido = tk.Frame(self.root, bg=self.COLOR_FONDO)
         self.frame_contenido.pack(fill="both", expand=True, padx=20, pady=10)
 
-        self.mostrar_inventario()
+        self.mostrar_bienvenida()
+
+    def mostrar_bienvenida(self):
+        for widget in self.frame_contenido.winfo_children():
+            widget.destroy()
+
+        ruta_script = os.path.dirname(os.path.abspath(__file__))
+        ruta_bienvenida = os.path.join(ruta_script, "Bienvenida.png")
+
+        try:
+            img_pil = Image.open(ruta_bienvenida)
+            self._foto_bienvenida = ImageTk.PhotoImage(img_pil)
+            lbl = tk.Label(self.frame_contenido, image=self._foto_bienvenida, bg=self.COLOR_FONDO)
+            lbl.place(relx=0.5, rely=0.5, anchor="center")
+        except ImportError:
+            try:
+                self._foto_bienvenida = tk.PhotoImage(file=ruta_bienvenida)
+                lbl = tk.Label(self.frame_contenido, image=self._foto_bienvenida, bg=self.COLOR_FONDO)
+                lbl.place(relx=0.5, rely=0.5, anchor="center")
+            except Exception:
+                tk.Label(self.frame_contenido, text="Bienvenido a GEOS",font=("Arial", 24, "bold"), bg=self.COLOR_FONDO,fg=self.COLOR_AZUL).place(relx=0.5, rely=0.5, anchor="center")
+        except Exception:
+            tk.Label(self.frame_contenido, text="Bienvenido a GEOS",font=("Arial", 24, "bold"), bg=self.COLOR_FONDO,fg=self.COLOR_AZUL).place(relx=0.5, rely=0.5, anchor="center")
 
     def cambiar_pestana(self, pestana):
         if pestana == self.pestana_actual: return
@@ -2233,7 +2254,6 @@ class SistemaGEOS:
         for widget in self.frame_finanzas_der.winfo_children():
             widget.destroy()
 
-    # ── ÚNICO MÉTODO MODIFICADO ──────────────────────────────────────────────
     def _finanzas_mostrar_bienvenida(self):
         self._finanzas_limpiar_der()
 
@@ -2277,7 +2297,6 @@ class SistemaGEOS:
         except Exception:
             tk.Label(self.frame_finanzas_der, text="[ Imagen Finanzas ]",
                      font=("Arial", 18), bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
-    # ── FIN DEL MÉTODO MODIFICADO ────────────────────────────────────────────
 
     def _finanzas_proximamente(self):
         self._finanzas_limpiar_der()
