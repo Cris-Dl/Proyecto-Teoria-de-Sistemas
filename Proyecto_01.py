@@ -5,6 +5,10 @@ import os
 import sqlite3
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from openpyxl import Workbook
+from openpyxl.styles import Font
+import os
+from datetime import datetime
 
 class TablasDB:
     DB_NAME = "geos_inventario.db"
@@ -1198,9 +1202,60 @@ class SistemaGEOS:
                 messagebox.showerror("Error", "No se pudo eliminar el producto")
 
     def exportar_excel(self):
-        messagebox.showinfo("Exportar",
-                            "Funcionalidad de exportación a Excel\n(Requiere librería openpyxl o xlsxwriter)")
+        productos = ProductosDB.obtener_todos()
 
+        if not productos:
+            messagebox.showwarning("Vacío", "No hay productos para exportar.")
+            return
+
+        ruta_base = os.path.dirname(os.path.abspath(__file__))
+        carpeta = os.path.join(ruta_base, "inventarios")
+
+        if not os.path.exists(carpeta):
+            os.makedirs(carpeta)
+
+        ahora = datetime.now().strftime("%Y%m%d-%H%M%S")
+        nombre_archivo = f"inventario-{ahora}.xlsx"
+        ruta_completa = os.path.join(carpeta, nombre_archivo)
+
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Inventario"
+
+            headers = ["ID", "Código", "Nombre", "Categoría", "Cantidad", "Precio Compra", "Precio Venta", "Proveedor"]
+            ws.append(headers)
+
+            for col in ws[1]:
+                col.font = Font(bold=True)
+
+            # Datos
+            for p in productos:
+                ws.append([
+                    p["id_num"],
+                    p["codigo"],
+                    p["nombre"],
+                    p["categoria"],
+                    p["cantidad"],
+                    p["precio_compra"],
+                    p["precio_venta"],
+                    p["proveedor"]
+                ])
+
+            for col in ws.columns:
+                max_length = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                ws.column_dimensions[col_letter].width = max_length + 2
+
+            wb.save(ruta_completa)
+
+            messagebox.showinfo("Éxito", f"Archivo guardado en:\n{ruta_completa}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo exportar:\n{str(e)}")
     def agregar_categoria(self):
         VentanaAgregarCategoria(self.root, self)
 
