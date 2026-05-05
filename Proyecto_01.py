@@ -1375,12 +1375,10 @@ class SistemaGEOS:
             ("Eliminar colaborador", self._rrhh_eliminar_colaborador),
         ]
 
-
         self.botones_rrhh_lateral = {}
 
         for texto, cmd in botones_rrhh:
             btn = tk.Button(frame_izq, text=texto, **btn_style)
-
             btn.config(command=lambda c=cmd, t=texto: self._seleccionar_boton_rrhh(t, c))
             btn.pack(fill="x", padx=10, pady=3)
             self.botones_rrhh_lateral[texto] = btn
@@ -2073,7 +2071,6 @@ class SistemaGEOS:
 
         tk.Frame(vent, bg="#CCCCCC", height=1).pack(fill="x", padx=20, pady=10)
 
-
         frame_cv = tk.Frame(vent, bg="#FFFFFF")
         frame_cv.pack(pady=10)
 
@@ -2105,14 +2102,12 @@ class SistemaGEOS:
                   bg="white", fg=self.COLOR_AZUL, relief="solid", borderwidth=2,
                   cursor="hand2", padx=8, pady=3, command=seleccionar_pdf).pack(side="left")
 
-
         frame_sec = tk.Frame(vent, bg="#FFFFFF")
         frame_sec.pack(pady=15)
         tk.Label(frame_sec, text="Código de seguridad:", font=("Arial", 10, "bold"), bg="#FFFFFF").pack(side="left",
                                                                                                         padx=5)
         entry_codigo = tk.Entry(frame_sec, font=("Arial", 10), show="*", width=15)
         entry_codigo.pack(side="left", padx=5)
-
 
         frame_btns = tk.Frame(vent, bg="#FFFFFF")
         frame_btns.pack(pady=20)
@@ -2138,8 +2133,6 @@ class SistemaGEOS:
         tk.Button(frame_btns, text="Cancelar", font=("Arial", 11, "bold"),
                   bg="#6C757D", fg="white", relief="flat", cursor="hand2", padx=25, pady=8,
                   command=vent.destroy).pack(side="left", padx=10)
-
-
 
     def mostrar_finanzas(self):
         for widget in self.frame_contenido.winfo_children():
@@ -2185,14 +2178,51 @@ class SistemaGEOS:
         for widget in self.frame_finanzas_der.winfo_children():
             widget.destroy()
 
+    # ── ÚNICO MÉTODO MODIFICADO ──────────────────────────────────────────────
     def _finanzas_mostrar_bienvenida(self):
         self._finanzas_limpiar_der()
-        tk.Label(self.frame_finanzas_der, text="Bienvenido al módulo de Finanzas",
-                 font=("Arial", 16, "bold"), bg=self.COLOR_FONDO,
-                 fg=self.COLOR_AZUL).place(relx=0.5, rely=0.45, anchor="center")
-        tk.Label(self.frame_finanzas_der, text="Seleccione una opción del menú lateral",
-                 font=("Arial", 10, "italic"), bg=self.COLOR_FONDO,
-                 fg="#888888").place(relx=0.5, rely=0.52, anchor="center")
+
+        ruta_script = os.path.dirname(os.path.abspath(__file__))
+        ruta_finanzas = os.path.join(ruta_script, "Finanzas.png")
+
+        try:
+            from PIL import Image, ImageTk
+            img_pil = Image.open(ruta_finanzas)
+            img_ancho, img_alto = img_pil.size
+
+            self._foto_finanzas = ImageTk.PhotoImage(img_pil)
+
+            frame_img = tk.Frame(self.frame_finanzas_der, bg="#F0F4FA",
+                                 highlightbackground="#CCCCCC", highlightthickness=1,
+                                 width=img_ancho, height=img_alto)
+            frame_img.place(relx=0.5, rely=0.5, anchor="center")
+            frame_img.pack_propagate(False)
+
+            lbl_img = tk.Label(frame_img, image=self._foto_finanzas, bg="#F0F4FA")
+            lbl_img.place(relx=0.5, rely=0.5, anchor="center")
+
+        except ImportError:
+            try:
+                self._foto_finanzas = tk.PhotoImage(file=ruta_finanzas)
+                img_ancho = self._foto_finanzas.width()
+                img_alto = self._foto_finanzas.height()
+
+                frame_img = tk.Frame(self.frame_finanzas_der, bg="#F0F4FA",
+                                     highlightbackground="#CCCCCC", highlightthickness=1,
+                                     width=img_ancho, height=img_alto)
+                frame_img.place(relx=0.5, rely=0.5, anchor="center")
+                frame_img.pack_propagate(False)
+
+                lbl_img = tk.Label(frame_img, image=self._foto_finanzas, bg="#F0F4FA")
+                lbl_img.place(relx=0.5, rely=0.5, anchor="center")
+
+            except Exception:
+                tk.Label(self.frame_finanzas_der, text="[ Imagen Finanzas ]",
+                         font=("Arial", 18), bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+        except Exception:
+            tk.Label(self.frame_finanzas_der, text="[ Imagen Finanzas ]",
+                     font=("Arial", 18), bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+    # ── FIN DEL MÉTODO MODIFICADO ────────────────────────────────────────────
 
     def _finanzas_proximamente(self):
         self._finanzas_limpiar_der()
@@ -2202,22 +2232,18 @@ class SistemaGEOS:
     def _finanzas_cuentas(self):
         self._finanzas_limpiar_der()
 
-
         tk.Label(self.frame_finanzas_der, text="Gestión de Cuentas",
                  font=("Arial", 14, "bold"), bg=self.COLOR_FONDO,
                  fg=self.COLOR_AZUL).pack(pady=(15, 5))
-
 
         frame_form_outer = tk.Frame(self.frame_finanzas_der, bg=self.COLOR_FONDO,
                                     highlightbackground="#AAAAAA", highlightthickness=2)
         frame_form_outer.pack(fill="x", padx=20, pady=5)
 
-
         frame_cols = tk.Frame(frame_form_outer, bg=self.COLOR_FONDO)
         frame_cols.pack(padx=20, pady=15, fill="x")
         frame_cols.columnconfigure(0, weight=1)
         frame_cols.columnconfigure(1, weight=1)
-
 
         frame_izq = tk.Frame(frame_cols, bg=self.COLOR_FONDO)
         frame_izq.grid(row=0, column=0, sticky="nsew", padx=(0, 20))
@@ -2241,13 +2267,10 @@ class SistemaGEOS:
         self._lb_estado_financiero.pack(anchor="w", pady=4)
         self._lb_estado_financiero.bind("<<ComboboxSelected>>", self._finanzas_on_estado_change)
 
-
         self._frame_der_dinamico = tk.Frame(frame_cols, bg=self.COLOR_FONDO)
         self._frame_der_dinamico.grid(row=0, column=1, sticky="nsew")
 
-
         self._finanzas_render_columna_der("Balance general")
-
 
         frame_btns = tk.Frame(self.frame_finanzas_der, bg=self.COLOR_FONDO)
         frame_btns.pack(pady=10)
@@ -2263,7 +2286,6 @@ class SistemaGEOS:
         tk.Button(frame_btns, text="Eliminar Seleccionada", font=("Arial", 10, "bold"),
                   bg="#DC3545", fg="white", relief="flat", cursor="hand2",
                   padx=20, pady=6, command=self._finanzas_eliminar_cuenta).pack(side="left", padx=8)
-
 
         tk.Label(self.frame_finanzas_der, text="Cuentas registradas",
                  font=("Arial", 11, "bold"), bg=self.COLOR_FONDO,
@@ -2294,19 +2316,16 @@ class SistemaGEOS:
         self._finanzas_render_columna_der(estado)
 
     def _finanzas_render_columna_der(self, estado):
-
         for w in self._frame_der_dinamico.winfo_children():
             w.destroy()
 
         if estado == "Balance general":
-
             tk.Label(self._frame_der_dinamico, text="Tipo:", font=("Arial", 9, "bold"),
                      bg=self.COLOR_FONDO).pack(anchor="w")
             self._lb_tipo = ttk.Combobox(self._frame_der_dinamico, font=("Arial", 10), width=18,
                                          values=["Activo", "Pasivo"], state="readonly")
             self._lb_tipo.current(0)
             self._lb_tipo.pack(anchor="w", pady=(4, 10))
-
 
             tk.Label(self._frame_der_dinamico, text="Clasificación:", font=("Arial", 9, "bold"),
                      bg=self.COLOR_FONDO).pack(anchor="w")
@@ -2316,7 +2335,6 @@ class SistemaGEOS:
             self._lb_corriente.pack(anchor="w", pady=(4, 10))
 
         else:
-
             tk.Label(self._frame_der_dinamico, text="Tipo:", font=("Arial", 9, "bold"),
                      bg=self.COLOR_FONDO).pack(anchor="w")
             self._lb_tipo = ttk.Combobox(self._frame_der_dinamico, font=("Arial", 10), width=18,
@@ -2324,11 +2342,9 @@ class SistemaGEOS:
             self._lb_tipo.current(0)
             self._lb_tipo.pack(anchor="w", pady=(4, 10))
 
-
             self._lb_corriente = ttk.Combobox(self._frame_der_dinamico, values=["N/A"], state="readonly")
             self._lb_corriente.current(0)
             self._lb_corriente.pack_forget()
-
 
         frame_valor = tk.Frame(self._frame_der_dinamico, bg=self.COLOR_FONDO)
         frame_valor.pack(anchor="w", pady=(6, 0))
@@ -2337,7 +2353,6 @@ class SistemaGEOS:
                  bg=self.COLOR_FONDO).pack(side="left", padx=(0, 6))
         tk.Label(frame_valor, text="Q.", font=("Arial", 10, "bold"),
                  bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).pack(side="left")
-
 
         valor_prev = "0.00"
         if hasattr(self, "_entry_cuenta_valor"):
@@ -2409,20 +2424,17 @@ class SistemaGEOS:
             else:
                 messagebox.showerror("Error", "No se pudo eliminar la cuenta.")
 
-
     def _finanzas_balance_general(self):
         self._finanzas_limpiar_der()
 
         COLOR = self.COLOR_FONDO
         AZUL  = self.COLOR_AZUL
 
-
         tk.Label(self.frame_finanzas_der, text="Balance de Situación General",
                  font=("Arial", 13, "bold"), bg=COLOR, fg=AZUL).pack(pady=(14, 0))
         fecha_hoy = datetime.now().strftime("%d/%m/%Y")
         tk.Label(self.frame_finanzas_der, text=f"fecha: {fecha_hoy}",
                  font=("Arial", 10, "italic"), bg=COLOR).pack(pady=(0, 8))
-
 
         frame_wrap = tk.Frame(self.frame_finanzas_der, bg=COLOR)
         frame_wrap.pack(fill="both", expand=True, padx=20)
@@ -2441,10 +2453,8 @@ class SistemaGEOS:
         canvas.bind("<Configure>", _on_resize)
         frame_rpt.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
-
         cuentas = CuentasDB.obtener_todas()
         bg = COLOR
-
 
         COL_SUBTOTAL = "#E8F0FB"
         COL_TOTAL    = "#D0E4FF"
@@ -2468,7 +2478,6 @@ class SistemaGEOS:
 
         def separador(parent):
             tk.Frame(parent, bg="#AAAAAA", height=1).pack(fill="x", padx=4, pady=1)
-
 
         tk.Label(frame_rpt, text="ACTIVO", font=("Arial", 10, "bold underline"),
                  bg=bg).pack(anchor="center", pady=(6, 2))
@@ -2496,7 +2505,6 @@ class SistemaGEOS:
         fila(frame_rpt, "Suma del Activo", valor_der=suma_activo, bold=True, bg_color=COL_TOTAL)
         separador(frame_rpt)
 
-
         tk.Label(frame_rpt, text="PATRIMONIO NETO Y PASIVO",
                  font=("Arial", 10, "bold underline"), bg=bg).pack(anchor="center", pady=(8, 2))
         tk.Label(frame_rpt, text="PASIVO", font=("Arial", 10, "bold underline"),
@@ -2522,7 +2530,6 @@ class SistemaGEOS:
         fila(frame_rpt, "", valor_der=suma_no_corr_p, bg_color=COL_SUBTOTAL)
         separador(frame_rpt)
 
-
         patrimonio = suma_activo - suma_pasivo
         tk.Label(frame_rpt, text="PATRIMONIO NETO", font=("Arial", 10, "bold underline"),
                  bg=bg).pack(anchor="center", pady=(6, 2))
@@ -2539,10 +2546,8 @@ class SistemaGEOS:
         COLOR = self.COLOR_FONDO
         AZUL  = self.COLOR_AZUL
 
-
         tk.Label(self.frame_finanzas_der, text="Estado de Resultados",
                  font=("Arial", 13, "bold"), bg=COLOR, fg=AZUL).pack(pady=(14, 8))
-
 
         frame_wrap = tk.Frame(self.frame_finanzas_der, bg=COLOR)
         frame_wrap.pack(fill="both", expand=True, padx=20)
@@ -2591,7 +2596,6 @@ class SistemaGEOS:
         gastos   = [c for c in er if c["tipo"] == "Gasto"]
         ingresos_er = [c for c in er if c["tipo"] == "Ingreso"]
 
-
         tk.Label(frame_rpt, text="Ingresos", font=("Arial", 10, "bold underline"),
                  bg=bg).pack(anchor="center", pady=(6, 2))
 
@@ -2603,7 +2607,6 @@ class SistemaGEOS:
         fila(frame_rpt, "(-) Devoluciones y Rebajas sobre Ventas", valor_der=devoluciones)
         fila(frame_rpt, "Utilidad Neta",                         valor_der=utilidad_neta, bold=True, bg_color=COL_SUBTOTAL)
         separador(frame_rpt)
-
 
         tk.Label(frame_rpt, text="Gastos", font=("Arial", 10, "bold underline"),
                  bg=bg).pack(anchor="center", pady=(6, 2))
@@ -2618,7 +2621,6 @@ class SistemaGEOS:
         fila(frame_rpt, "Resultado de Operación", valor_der=resultado_operacion, bold=True, bg_color=COL_SUBTOTAL)
         separador(frame_rpt)
 
-
         tk.Label(frame_rpt, text="Otros Ingresos", font=("Arial", 10, "bold underline"),
                  bg=bg).pack(anchor="center", pady=(6, 2))
 
@@ -2631,7 +2633,6 @@ class SistemaGEOS:
         diferencia_positiva = resultado_operacion + suma_otros_ing
         fila(frame_rpt, "Diferencia Positiva", valor_der=diferencia_positiva, bold=True, bg_color=COL_SUBTOTAL)
         separador(frame_rpt)
-
 
         tk.Label(frame_rpt, text="Otros Gastos", font=("Arial", 10, "bold underline"),
                  bg=bg).pack(anchor="center", pady=(6, 2))
