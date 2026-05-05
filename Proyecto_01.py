@@ -3003,8 +3003,8 @@ class VentanaEditarProveedor:
         else:
             messagebox.showerror("Error", "No se pudo actualizar")
 
-
 if __name__ == "__main__":
     root = tk.Tk()
     app = Login(root)
     root.mainloop()
+
