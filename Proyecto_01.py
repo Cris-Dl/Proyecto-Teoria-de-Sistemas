@@ -745,7 +745,7 @@ class GeneradorRecibos:
 class Login:
     def __init__(self, root):
         self.root = root
-        self.root.title("GEOS - Herramientas y Equipos")
+        self.root.title("SIRIO - MG")
         self.root.geometry("500x600")
         self.root.configure(bg="#FFFFFF")
         self.root.resizable(False, False)
@@ -758,7 +758,7 @@ class Login:
         self.centrar_ventana(500, 600)
 
         ruta_script = os.path.dirname(os.path.abspath(__file__))
-        ruta_logo = os.path.join(ruta_script, "logo_geos.png")
+        ruta_logo = os.path.join(ruta_script, "logo_codenova.png")
 
         try:
             self.imagen = tk.PhotoImage(file=ruta_logo)
@@ -848,7 +848,7 @@ class Login:
 class SistemaGEOS:
     def __init__(self, root):
         self.root = root
-        self.root.title("GEOS - Herramientas y Equipos")
+        self.root.title("SIRIO-MG")
         self.root.state('zoomed')
         self.root.configure(bg="#FFFFFF")
 

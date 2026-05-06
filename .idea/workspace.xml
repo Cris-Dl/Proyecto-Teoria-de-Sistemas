@@ -4,8 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="Imagen RRHH">
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="Correccion de errores con la bienvenida">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Proyecto_01.py" beforeDir="false" afterPath="$PROJECT_DIR$/Proyecto_01.py" afterDir="false" />
     </list>
@@ -151,7 +150,23 @@
       <option name="project" value="LOCAL" />
       <updated>1778026174359</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Correccion de errores con la bienvenida">
+      <option name="closed" value="true" />
+      <created>1778027302078</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1778027302078</updated>
+    </task>
+    <task id="LOCAL-00007" summary="Correccion de errores con la bienvenida">
+      <option name="closed" value="true" />
+      <created>1778027351009</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1778027351009</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -183,6 +198,7 @@
     <MESSAGE value="Agregado de proveedores, aactualización de información del inventario" />
     <MESSAGE value="Imagen RRHH" />
     <MESSAGE value="Agregado del apartado de clientes junto con modificacion de la emision de facturas" />
-    <option name="LAST_COMMIT_MESSAGE" value="Agregado del apartado de clientes junto con modificacion de la emision de facturas" />
+    <MESSAGE value="Correccion de errores con la bienvenida" />
+    <option name="LAST_COMMIT_MESSAGE" value="Correccion de errores con la bienvenida" />
   </component>
 </project>
