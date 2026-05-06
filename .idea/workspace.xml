@@ -4,8 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="excel">
-      <change afterPath="$PROJECT_DIR$/Bienvenida.png" afterDir="false" />
+    <list default="true" id="d1356f8b-6527-4e42-8988-eb56773f9e35" name="Changes" comment="Imagen RRHH">
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Proyecto_01.py" beforeDir="false" afterPath="$PROJECT_DIR$/Proyecto_01.py" afterDir="false" />
     </list>
@@ -86,7 +86,6 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="RUN_TOOL" value="" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Proyecto_01.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -144,13 +143,13 @@
       <option name="project" value="LOCAL" />
       <updated>1772581096527</updated>
     </task>
-    <task id="LOCAL-00005" summary="excel">
+    <task id="LOCAL-00005" summary="Agregado del apartado de clientes junto con modificacion de la emision de facturas">
       <option name="closed" value="true" />
-      <created>1778006798956</created>
+      <created>1778026174359</created>
       <option name="number" value="00005" />
       <option name="presentableId" value="LOCAL-00005" />
       <option name="project" value="LOCAL" />
-      <updated>1778006798957</updated>
+      <updated>1778026174359</updated>
     </task>
     <option name="localTasksCounter" value="6" />
     <servers />
@@ -183,7 +182,7 @@
     <MESSAGE value="agregado del logo de la empresa" />
     <MESSAGE value="Agregado de proveedores, aactualización de información del inventario" />
     <MESSAGE value="Imagen RRHH" />
-    <MESSAGE value="excel" />
-    <option name="LAST_COMMIT_MESSAGE" value="excel" />
+    <MESSAGE value="Agregado del apartado de clientes junto con modificacion de la emision de facturas" />
+    <option name="LAST_COMMIT_MESSAGE" value="Agregado del apartado de clientes junto con modificacion de la emision de facturas" />
   </component>
 </project>

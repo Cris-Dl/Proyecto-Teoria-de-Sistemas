@@ -1,13 +1,14 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 from datetime import datetime, timedelta
+import os
 import sqlite3
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from openpyxl import Workbook
 from openpyxl.styles import Font
-from PIL import Image, ImageTk
 import os
+from datetime import datetime
 
 class TablasDB:
     DB_NAME = "geos_inventario.db"
@@ -859,7 +860,7 @@ class SistemaGEOS:
 
         self.carrito_compras = []
 
-        self.pestana_actual = "Inventario"
+        self.pestana_actual = None
         self.crear_interfaz()
 
     def confirmar_cierre(self):
@@ -918,9 +919,10 @@ class SistemaGEOS:
             widget.destroy()
 
         ruta_script = os.path.dirname(os.path.abspath(__file__))
-        ruta_bienvenida = os.path.join(ruta_script, "Bienvenida.png")
+        ruta_bienvenida = os.path.join(ruta_script, "bienvenida.png")
 
         try:
+            from PIL import Image, ImageTk
             img_pil = Image.open(ruta_bienvenida)
             self._foto_bienvenida = ImageTk.PhotoImage(img_pil)
             lbl = tk.Label(self.frame_contenido, image=self._foto_bienvenida, bg=self.COLOR_FONDO)
@@ -931,9 +933,13 @@ class SistemaGEOS:
                 lbl = tk.Label(self.frame_contenido, image=self._foto_bienvenida, bg=self.COLOR_FONDO)
                 lbl.place(relx=0.5, rely=0.5, anchor="center")
             except Exception:
-                tk.Label(self.frame_contenido, text="Bienvenido a GEOS",font=("Arial", 24, "bold"), bg=self.COLOR_FONDO,fg=self.COLOR_AZUL).place(relx=0.5, rely=0.5, anchor="center")
+                tk.Label(self.frame_contenido, text="GEOS\nHerramientas y Equipos",
+                         font=("Arial", 48, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).place(
+                    relx=0.5, rely=0.5, anchor="center")
         except Exception:
-            tk.Label(self.frame_contenido, text="Bienvenido a GEOS",font=("Arial", 24, "bold"), bg=self.COLOR_FONDO,fg=self.COLOR_AZUL).place(relx=0.5, rely=0.5, anchor="center")
+            tk.Label(self.frame_contenido, text="GEOS\nHerramientas y Equipos",
+                     font=("Arial", 48, "bold"), bg=self.COLOR_FONDO, fg=self.COLOR_AZUL).place(
+                relx=0.5, rely=0.5, anchor="center")
 
     def cambiar_pestana(self, pestana):
         if pestana == self.pestana_actual: return
@@ -1038,7 +1044,7 @@ class SistemaGEOS:
                                         fg="#333333")
         self.lbl_total_pagar.pack()
 
-        btn_cobrar = tk.Button(frame_totales, text="CONFIRMAR VENTA", bg=self.COLOR_AZUL, fg="white",
+        btn_cobrar = tk.Button(frame_totales, text="REALIZAR VENTA", bg=self.COLOR_AZUL, fg="white",
                                font=("Arial", 14, "bold"), width=20, command=self.abrir_confirmar_venta, cursor="hand2")
         btn_cobrar.pack(pady=15)
 
@@ -1257,40 +1263,6 @@ class SistemaGEOS:
                 messagebox.showinfo("Éxito", "Cliente eliminado correctamente.")
             else:
                 messagebox.showerror("Error", "No se pudo eliminar el cliente.")
-
-
-        if not self.carrito_compras:
-            messagebox.showwarning("Vacío", "El carrito está vacío.")
-            return
-
-        respuesta = messagebox.askyesno("Confirmar Venta", "¿Desea procesar la venta y descontar del inventario?")
-        if respuesta:
-            exito = True
-            for item in self.carrito_compras:
-                if not ProductosDB.actualizar_stock(item["id"], item["cantidad"]):
-                    exito = False
-
-            if exito:
-                total = sum(item["cantidad"] * item["precio"] for item in self.carrito_compras)
-
-                cliente = getattr(self, 'cliente_venta_actual', {"nit": "C/F", "nombre": "CLIENTE FINAL", "telefono": ""})
-                nit_receptor = cliente.get("nit", "C/F") or "C/F"
-                nombre_receptor = cliente.get("nombre", "CLIENTE FINAL") or "CLIENTE FINAL"
-
-                try:
-                    archivo_recibo = GeneradorRecibos.generar_recibo(self.carrito_compras, total, nit_receptor, nombre_receptor)
-                    messagebox.showinfo("Venta Exitosa",
-                                        f"La venta se ha registrado y el inventario actualizado.\n\n" +
-                                        f"Recibo generado: {archivo_recibo}")
-                except Exception as e:
-                    messagebox.showinfo("Venta Exitosa",
-                                        "La venta se ha registrado y el inventario actualizado.\n\n" +
-                                        f"(No se pudo generar el recibo PDF: {str(e)})")
-
-                self.limpiar_carrito()
-                self.cargar_productos_venta()
-            else:
-                messagebox.showerror("Error", "Hubo un problema al actualizar algunos productos.")
 
     def crear_tabla(self):
         frame_tabla = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
@@ -2444,6 +2416,7 @@ class SistemaGEOS:
         for widget in self.frame_finanzas_der.winfo_children():
             widget.destroy()
 
+    # ── ÚNICO MÉTODO MODIFICADO ──────────────────────────────────────────────
     def _finanzas_mostrar_bienvenida(self):
         self._finanzas_limpiar_der()
 
@@ -2487,6 +2460,7 @@ class SistemaGEOS:
         except Exception:
             tk.Label(self.frame_finanzas_der, text="[ Imagen Finanzas ]",
                      font=("Arial", 18), bg="#F0F4FA", fg="#AAAAAA").place(relx=0.5, rely=0.5, anchor="center")
+    # ── FIN DEL MÉTODO MODIFICADO ────────────────────────────────────────────
 
     def _finanzas_proximamente(self):
         self._finanzas_limpiar_der()
