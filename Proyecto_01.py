@@ -76,6 +76,14 @@ class TablasDB:
             );
         """)
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS clientes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nit TEXT UNIQUE NOT NULL,
+                nombre TEXT NOT NULL,
+                telefono TEXT
+            );
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS cuentas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT NOT NULL,
@@ -494,9 +502,70 @@ class CuentasDB:
             conn.close()
 
 
+class ClientesDB:
+    @staticmethod
+    def agregar(nit, nombre, telefono=""):
+        conn = TablasDB._conn()
+        try:
+            conn.execute(
+                "INSERT INTO clientes (nit, nombre, telefono) VALUES (?, ?, ?)",
+                (nit, nombre, telefono)
+            )
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def obtener_todos():
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("SELECT * FROM clientes ORDER BY nit")
+            return [{"id": r["id"], "nit": r["nit"], "nombre": r["nombre"], "telefono": r["telefono"] or ""} for r in cursor]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def obtener_por_nit(nit):
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("SELECT * FROM clientes WHERE nit = ?", (nit,))
+            row = cursor.fetchone()
+            if row:
+                return {"id": row["id"], "nit": row["nit"], "nombre": row["nombre"], "telefono": row["telefono"] or ""}
+            return None
+        finally:
+            conn.close()
+
+    @staticmethod
+    def actualizar(id_cliente, nit, nombre, telefono=""):
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute(
+                "UPDATE clientes SET nit=?, nombre=?, telefono=? WHERE id=?",
+                (nit, nombre, telefono, id_cliente)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    @staticmethod
+    def eliminar(id_cliente):
+        conn = TablasDB._conn()
+        try:
+            cursor = conn.execute("DELETE FROM clientes WHERE id = ?", (id_cliente,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+
 class GeneradorRecibos:
     @staticmethod
-    def generar_recibo(carrito, total, nit_receptor="C/F"):
+    def generar_recibo(carrito, total, nit_receptor="C/F", nombre_receptor="CLIENTE FINAL"):
         carpeta_recibos = "recibos"
         if not os.path.exists(carpeta_recibos):
             os.makedirs(carpeta_recibos)
@@ -533,7 +602,7 @@ class GeneradorRecibos:
         y -= 12
         c.drawString(margen_izq, y, f"NIT Receptor: {nit_receptor}")
         y -= 12
-        c.drawString(margen_izq, y, "Nombre Receptor: CLIENTE FINAL")
+        c.drawString(margen_izq, y, f"Nombre Receptor: {nombre_receptor}")
         y -= 25
 
         fecha_actual = datetime.now()
@@ -879,6 +948,8 @@ class SistemaGEOS:
             self.mostrar_ventas()
         elif pestana == "Proveedores":
             self.mostrar_proveedores()
+        elif pestana == "Clientes":
+            self.mostrar_clientes()
         elif pestana == "RRHH":
             self.mostrar_rrhh()
         elif pestana == "Finanzas":
@@ -890,16 +961,6 @@ class SistemaGEOS:
 
     def mostrar_ventas(self):
         for widget in self.frame_contenido.winfo_children(): widget.destroy()
-
-        frame_nit = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
-        frame_nit.pack(fill="x", pady=5, padx=20)
-        tk.Label(frame_nit, text="NIT Receptor:", font=("Arial", 10, "bold"), bg=self.COLOR_FONDO).pack(side="left",
-                                                                                                        padx=5)
-        self.entry_nit_receptor = tk.Entry(frame_nit, font=("Arial", 10), width=15)
-        self.entry_nit_receptor.pack(side="left", padx=5)
-        self.entry_nit_receptor.insert(0, "C/F")
-        tk.Label(frame_nit, text="(C/F para consumidor final)", font=("Arial", 8, "italic"), bg=self.COLOR_FONDO,
-                 fg="#666").pack(side="left", padx=5)
 
         paned = tk.PanedWindow(self.frame_contenido, orient="horizontal", bg="#DDDDDD", sashwidth=5)
         paned.pack(fill="both", expand=True)
@@ -977,11 +1038,12 @@ class SistemaGEOS:
                                         fg="#333333")
         self.lbl_total_pagar.pack()
 
-        btn_cobrar = tk.Button(frame_totales, text="REALIZAR VENTA", bg=self.COLOR_AZUL, fg="white",
-                               font=("Arial", 14, "bold"), width=20, command=self.finalizar_venta, cursor="hand2")
+        btn_cobrar = tk.Button(frame_totales, text="CONFIRMAR VENTA", bg=self.COLOR_AZUL, fg="white",
+                               font=("Arial", 14, "bold"), width=20, command=self.abrir_confirmar_venta, cursor="hand2")
         btn_cobrar.pack(pady=15)
 
         tk.Button(frame_totales, text="Limpiar Carrito", command=self.limpiar_carrito).pack()
+
 
     def cargar_productos_venta(self):
         for item in self.tabla_prod_venta.get_children():
@@ -1068,7 +1130,135 @@ class SistemaGEOS:
         self.carrito_compras = []
         self.actualizar_vista_carrito()
 
-    def finalizar_venta(self):
+    def seleccionar_cliente_venta(self):
+        VentanaDatosCliente(self.root, self)
+
+    def abrir_confirmar_venta(self):
+        if not self.carrito_compras:
+            messagebox.showwarning("Vacío", "El carrito está vacío.")
+            return
+        VentanaDatosCliente(self.root, self)
+
+    def finalizar_venta(self, nit_receptor, nombre_receptor):
+        exito = True
+        for item in self.carrito_compras:
+            if not ProductosDB.actualizar_stock(item["id"], item["cantidad"]):
+                exito = False
+
+        if exito:
+            total = sum(item["cantidad"] * item["precio"] for item in self.carrito_compras)
+            try:
+                archivo_recibo = GeneradorRecibos.generar_recibo(self.carrito_compras, total, nit_receptor, nombre_receptor)
+                messagebox.showinfo("Venta Exitosa",
+                                    f"La venta se ha registrado y el inventario actualizado.\n\n"
+                                    f"Recibo generado: {archivo_recibo}")
+            except Exception as e:
+                messagebox.showinfo("Venta Exitosa",
+                                    "La venta se ha registrado y el inventario actualizado.\n\n"
+                                    f"(No se pudo generar el recibo PDF: {str(e)})")
+            self.limpiar_carrito()
+            self.cargar_productos_venta()
+        else:
+            messagebox.showerror("Error", "Hubo un problema al actualizar algunos productos.")
+
+    def mostrar_clientes(self):
+        for widget in self.frame_contenido.winfo_children():
+            widget.destroy()
+
+        frame_top = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
+        frame_top.pack(fill="x", pady=(0, 10))
+
+        tk.Label(frame_top, text="CLIENTES", font=("Arial", 16, "bold"), bg=self.COLOR_FONDO,
+                 fg=self.COLOR_AZUL).pack(side="left", padx=10)
+
+        frame_botones_cl = tk.Frame(frame_top, bg=self.COLOR_FONDO)
+        frame_botones_cl.pack(side="right", padx=10)
+
+        tk.Button(frame_botones_cl, text="+ Agregar Cliente", font=("Arial", 10, "bold"),
+                  bg=self.COLOR_AZUL, fg="white", relief="flat", cursor="hand2", padx=15, pady=6,
+                  command=self.agregar_cliente).pack(side="left", padx=5)
+        tk.Button(frame_botones_cl, text="Editar", font=("Arial", 10, "bold"),
+                  bg="#1E88E5", fg="white", relief="flat", cursor="hand2", padx=15, pady=6,
+                  command=self.editar_cliente).pack(side="left", padx=5)
+        tk.Button(frame_botones_cl, text="Eliminar", font=("Arial", 10, "bold"),
+                  bg="#DC3545", fg="white", relief="flat", cursor="hand2", padx=15, pady=6,
+                  command=self.eliminar_cliente).pack(side="left", padx=5)
+
+        frame_busq_cl = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
+        frame_busq_cl.pack(fill="x", padx=10, pady=5)
+        tk.Label(frame_busq_cl, text="Buscar (NIT, Nombre, Teléfono):", font=("Arial", 10), bg=self.COLOR_FONDO).pack(side="left")
+        self.entry_buscar_clientes = tk.Entry(frame_busq_cl, font=("Arial", 10), width=35)
+        self.entry_buscar_clientes.pack(side="left", padx=8)
+        self.entry_buscar_clientes.bind("<KeyRelease>", self.filtrar_clientes)
+
+        frame_tabla_cl = tk.Frame(self.frame_contenido, bg=self.COLOR_FONDO)
+        frame_tabla_cl.pack(fill="both", expand=True, padx=10)
+
+        scroll_y_cl = ttk.Scrollbar(frame_tabla_cl, orient="vertical")
+        scroll_y_cl.pack(side="right", fill="y")
+
+        columnas_cl = ("ID", "NIT", "Nombre", "Teléfono")
+        self.tabla_clientes = ttk.Treeview(frame_tabla_cl, columns=columnas_cl, show="headings",
+                                           yscrollcommand=scroll_y_cl.set)
+        self.tabla_clientes.heading("ID", text="ID")
+        self.tabla_clientes.heading("NIT", text="NIT")
+        self.tabla_clientes.heading("Nombre", text="Nombre")
+        self.tabla_clientes.heading("Teléfono", text="Teléfono")
+        self.tabla_clientes.column("ID", width=50, anchor="center")
+        self.tabla_clientes.column("NIT", width=150, anchor="center")
+        self.tabla_clientes.column("Nombre", width=350, anchor="w")
+        self.tabla_clientes.column("Teléfono", width=150, anchor="center")
+
+        scroll_y_cl.config(command=self.tabla_clientes.yview)
+        self.tabla_clientes.pack(fill="both", expand=True)
+        self.tabla_clientes.bind("<Double-1>", self.editar_cliente)
+
+        self.cargar_clientes()
+
+    def cargar_clientes(self):
+        if not hasattr(self, 'tabla_clientes'): return
+        for item in self.tabla_clientes.get_children():
+            self.tabla_clientes.delete(item)
+        for c in ClientesDB.obtener_todos():
+            self.tabla_clientes.insert("", "end", values=(c["id"], c["nit"], c["nombre"], c["telefono"]))
+
+    def filtrar_clientes(self, event=None):
+        filtro = self.entry_buscar_clientes.get().lower()
+        for item in self.tabla_clientes.get_children():
+            self.tabla_clientes.delete(item)
+        for c in ClientesDB.obtener_todos():
+            if (filtro in c["nit"].lower() or filtro in c["nombre"].lower() or filtro in c["telefono"].lower()):
+                self.tabla_clientes.insert("", "end", values=(c["id"], c["nit"], c["nombre"], c["telefono"]))
+
+    def agregar_cliente(self):
+        VentanaAgregarCliente(self.root, self)
+
+    def editar_cliente(self, event=None):
+        if event and not hasattr(self, 'tabla_clientes'): return
+        if event and not self.tabla_clientes.identify_row(event.y): return
+        seleccion = self.tabla_clientes.selection()
+        if not seleccion:
+            messagebox.showwarning("Advertencia", "Seleccione un cliente para editar.")
+            return
+        vals = self.tabla_clientes.item(seleccion[0])["values"]
+        cliente = {"id": vals[0], "nit": vals[1], "nombre": vals[2], "telefono": vals[3]}
+        VentanaEditarCliente(self.root, self, cliente)
+
+    def eliminar_cliente(self):
+        seleccion = self.tabla_clientes.selection()
+        if not seleccion:
+            messagebox.showwarning("Advertencia", "Seleccione un cliente para eliminar.")
+            return
+        vals = self.tabla_clientes.item(seleccion[0])["values"]
+        respuesta = messagebox.askyesno("Confirmar", f"¿Eliminar al cliente '{vals[2]}' con NIT {vals[1]}?")
+        if respuesta:
+            if ClientesDB.eliminar(vals[0]):
+                self.cargar_clientes()
+                messagebox.showinfo("Éxito", "Cliente eliminado correctamente.")
+            else:
+                messagebox.showerror("Error", "No se pudo eliminar el cliente.")
+
+
         if not self.carrito_compras:
             messagebox.showwarning("Vacío", "El carrito está vacío.")
             return
@@ -1083,12 +1273,12 @@ class SistemaGEOS:
             if exito:
                 total = sum(item["cantidad"] * item["precio"] for item in self.carrito_compras)
 
-                nit_receptor = self.entry_nit_receptor.get().strip()
-                if not nit_receptor:
-                    nit_receptor = "C/F"
+                cliente = getattr(self, 'cliente_venta_actual', {"nit": "C/F", "nombre": "CLIENTE FINAL", "telefono": ""})
+                nit_receptor = cliente.get("nit", "C/F") or "C/F"
+                nombre_receptor = cliente.get("nombre", "CLIENTE FINAL") or "CLIENTE FINAL"
 
                 try:
-                    archivo_recibo = GeneradorRecibos.generar_recibo(self.carrito_compras, total, nit_receptor)
+                    archivo_recibo = GeneradorRecibos.generar_recibo(self.carrito_compras, total, nit_receptor, nombre_receptor)
                     messagebox.showinfo("Venta Exitosa",
                                         f"La venta se ha registrado y el inventario actualizado.\n\n" +
                                         f"Recibo generado: {archivo_recibo}")
@@ -3077,8 +3267,255 @@ class VentanaEditarProveedor:
         else:
             messagebox.showerror("Error", "No se pudo actualizar")
 
+class VentanaDatosCliente:
+    def __init__(self, parent, sistema):
+        self.sistema = sistema
+        self.ventana = tk.Toplevel(parent)
+        self.ventana.title("Confirmar Venta")
+        self.ventana.configure(bg="#FFFFFF")
+        self.ventana.transient(parent)
+        self.ventana.grab_set()
+        self.centrar_ventana()
+
+        tk.Label(self.ventana, text="Confirmar Venta", font=("Arial", 16, "bold"),
+                 bg="#FFFFFF", fg="#0055A5").pack(pady=(15, 5))
+
+        # --- Resumen del carrito ---
+        tk.Label(self.ventana, text="Productos en el carrito:", font=("Arial", 10, "bold"),
+                 bg="#FFFFFF", anchor="w").pack(fill="x", padx=30)
+
+        frame_tabla = tk.Frame(self.ventana, bg="#FFFFFF")
+        frame_tabla.pack(fill="both", expand=True, padx=30, pady=(3, 8))
+
+        col_c = ("Producto", "Cant.", "Subtotal")
+        tabla_resumen = ttk.Treeview(frame_tabla, columns=col_c, show="headings", height=6)
+        tabla_resumen.heading("Producto", text="Producto")
+        tabla_resumen.heading("Cant.", text="Cant.")
+        tabla_resumen.heading("Subtotal", text="Subtotal")
+        tabla_resumen.column("Producto", width=220, anchor="w")
+        tabla_resumen.column("Cant.", width=60, anchor="center")
+        tabla_resumen.column("Subtotal", width=90, anchor="center")
+        tabla_resumen.pack(fill="both", expand=True)
+
+        total = 0.0
+        for item in sistema.carrito_compras:
+            tabla_resumen.insert("", "end", values=(item["nombre"], int(item["cantidad"]), f"Q{item['subtotal']:.2f}"))
+            total += item["subtotal"]
+
+        tk.Label(self.ventana, text=f"TOTAL: Q{total:.2f}", font=("Arial", 13, "bold"),
+                 bg="#FFFFFF", fg="#0055A5").pack(anchor="e", padx=30, pady=(0, 8))
+
+        ttk.Separator(self.ventana, orient="horizontal").pack(fill="x", padx=20, pady=4)
+
+        # --- Datos del cliente ---
+        tk.Label(self.ventana, text="Datos del Cliente:", font=("Arial", 10, "bold"),
+                 bg="#FFFFFF", anchor="w").pack(fill="x", padx=30)
+
+        frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
+        frame_form.pack(padx=30, pady=5, fill="x")
+
+        tk.Label(frame_form, text="NIT:", font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=0, column=0, sticky="e", pady=6, padx=5)
+        frame_nit_row = tk.Frame(frame_form, bg="#FFFFFF")
+        frame_nit_row.grid(row=0, column=1, sticky="ew", pady=6, padx=5)
+        self.entry_nit = tk.Entry(frame_nit_row, font=("Arial", 11), width=18)
+        self.entry_nit.pack(side="left")
+        self.entry_nit.insert(0, "C/F")
+        tk.Button(frame_nit_row, text="Buscar", font=("Arial", 9, "bold"), bg="#0055A5", fg="white",
+                  relief="flat", cursor="hand2", padx=8, command=self.buscar_por_nit).pack(side="left", padx=(8, 0))
+        tk.Label(frame_nit_row, text="(C/F = Consumidor Final)", font=("Arial", 8, "italic"),
+                 bg="#FFFFFF", fg="#888").pack(side="left", padx=(8, 0))
+
+        self.lbl_nombre = tk.Label(frame_form, text="Nombre:", font=("Arial", 11, "bold"), bg="#FFFFFF")
+        self.lbl_nombre.grid(row=1, column=0, sticky="e", pady=6, padx=5)
+        self.entry_nombre = tk.Entry(frame_form, font=("Arial", 11), width=30)
+        self.entry_nombre.grid(row=1, column=1, sticky="ew", pady=6, padx=5)
+        self.entry_nombre.insert(0, "CLIENTE FINAL")
+
+        self.lbl_tel = tk.Label(frame_form, text="Teléfono:", font=("Arial", 11, "bold"), bg="#FFFFFF")
+        self.lbl_tel.grid(row=2, column=0, sticky="e", pady=6, padx=5)
+        self.entry_tel = tk.Entry(frame_form, font=("Arial", 11), width=30)
+        self.entry_tel.grid(row=2, column=1, sticky="ew", pady=6, padx=5)
+
+        self.lbl_info = tk.Label(self.ventana, text="", font=("Arial", 9, "italic"), bg="#FFFFFF", fg="#0055A5")
+        self.lbl_info.pack()
+
+        # Ocultar nombre y teléfono si el NIT es C/F al inicio
+        self._actualizar_visibilidad_campos()
+        self.entry_nit.bind("<KeyRelease>", lambda e: self._actualizar_visibilidad_campos())
+
+        # --- Botones ---
+        frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
+        frame_botones.pack(pady=12)
+        tk.Button(frame_botones, text="REALIZAR VENTA", font=("Arial", 12, "bold"), bg="#0055A5", fg="white",
+                  relief="flat", cursor="hand2", padx=25, pady=10, command=self.confirmar_y_vender).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white",
+                  relief="flat", cursor="hand2", padx=20, pady=10, command=self.ventana.destroy).pack(side="left", padx=10)
+
+    def centrar_ventana(self):
+        self.ventana.update_idletasks()
+        ancho, alto = 560, 560
+        x = (self.ventana.winfo_screenwidth() // 2) - (ancho // 2)
+        y = (self.ventana.winfo_screenheight() // 2) - (alto // 2)
+        self.ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+    def _actualizar_visibilidad_campos(self):
+        nit = self.entry_nit.get().strip().upper()
+        if nit == "C/F" or nit == "":
+            self.lbl_nombre.grid_remove()
+            self.entry_nombre.grid_remove()
+            self.lbl_tel.grid_remove()
+            self.entry_tel.grid_remove()
+        else:
+            self.lbl_nombre.grid()
+            self.entry_nombre.grid()
+            self.lbl_tel.grid()
+            self.entry_tel.grid()
+
+    def buscar_por_nit(self):
+        nit = self.entry_nit.get().strip()
+        if not nit or nit.upper() == "C/F":
+            messagebox.showwarning("Atención", "Ingrese un NIT para buscar.", parent=self.ventana)
+            return
+        self._actualizar_visibilidad_campos()
+        cliente = ClientesDB.obtener_por_nit(nit)
+        if cliente:
+            self.entry_nombre.delete(0, "end")
+            self.entry_nombre.insert(0, cliente["nombre"])
+            self.entry_tel.delete(0, "end")
+            self.entry_tel.insert(0, cliente["telefono"])
+            self.lbl_info.config(text="✔ Cliente encontrado.", fg="#28A745")
+        else:
+            self.entry_nombre.delete(0, "end")
+            self.entry_tel.delete(0, "end")
+            self.lbl_info.config(text="Cliente nuevo — se guardará al realizar la venta.", fg="#FF8C00")
+
+    def confirmar_y_vender(self):
+        nit = self.entry_nit.get().strip() or "C/F"
+
+        if nit.upper() == "C/F":
+            nombre = "CLIENTE FINAL"
+            telefono = ""
+        else:
+            nombre = self.entry_nombre.get().strip() or "CLIENTE FINAL"
+            telefono = self.entry_tel.get().strip()
+
+        # Guardar cliente en BD si no es C/F
+        if nit.upper() != "C/F":
+            existente = ClientesDB.obtener_por_nit(nit)
+            if not existente:
+                ClientesDB.agregar(nit, nombre, telefono)
+            else:
+                ClientesDB.actualizar(existente["id"], nit, nombre, telefono)
+
+        self.ventana.destroy()
+        self.sistema.finalizar_venta(nit, nombre)
+
+
+class VentanaAgregarCliente:
+    def __init__(self, parent, sistema):
+        self.sistema = sistema
+        self.ventana = tk.Toplevel(parent)
+        self.ventana.title("Agregar Cliente")
+        self.ventana.configure(bg="#FFFFFF")
+        self.ventana.transient(parent)
+        self.ventana.grab_set()
+        self.centrar_ventana()
+
+        tk.Label(self.ventana, text="Agregar Cliente", font=("Arial", 16, "bold"),
+                 bg="#FFFFFF", fg="#0055A5").pack(pady=18)
+
+        frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
+        frame_form.pack(padx=40, pady=5, fill="both")
+
+        self.widgets = {}
+        for i, label in enumerate(["NIT:", "Nombre:", "Teléfono:"]):
+            tk.Label(frame_form, text=label, font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="e", pady=10, padx=5)
+            entry = tk.Entry(frame_form, font=("Arial", 11), width=30)
+            entry.grid(row=i, column=1, sticky="ew", pady=10, padx=5)
+            self.widgets[label] = entry
+
+        frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
+        frame_botones.pack(pady=20)
+        tk.Button(frame_botones, text="Guardar", font=("Arial", 11, "bold"), bg="#0055A5", fg="white",
+                  relief="flat", cursor="hand2", padx=30, pady=8, command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white",
+                  relief="flat", cursor="hand2", padx=30, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
+
+    def centrar_ventana(self):
+        self.ventana.update_idletasks()
+        ancho, alto = 440, 300
+        x = (self.ventana.winfo_screenwidth() // 2) - (ancho // 2)
+        y = (self.ventana.winfo_screenheight() // 2) - (alto // 2)
+        self.ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+    def guardar(self):
+        vals = {k: v.get().strip() for k, v in self.widgets.items()}
+        if not vals["NIT:"] or not vals["Nombre:"]:
+            messagebox.showerror("Error", "NIT y Nombre son obligatorios.", parent=self.ventana)
+            return
+        if ClientesDB.agregar(vals["NIT:"], vals["Nombre:"], vals["Teléfono:"]):
+            self.sistema.cargar_clientes()
+            messagebox.showinfo("Éxito", "Cliente agregado correctamente.")
+            self.ventana.destroy()
+        else:
+            messagebox.showerror("Error", "Ya existe un cliente con ese NIT.")
+
+
+class VentanaEditarCliente:
+    def __init__(self, parent, sistema, cliente):
+        self.sistema = sistema
+        self.cliente_original = cliente
+        self.ventana = tk.Toplevel(parent)
+        self.ventana.title("Editar Cliente")
+        self.ventana.configure(bg="#FFFFFF")
+        self.ventana.transient(parent)
+        self.ventana.grab_set()
+        self.centrar_ventana()
+
+        tk.Label(self.ventana, text="Editar Cliente", font=("Arial", 16, "bold"),
+                 bg="#FFFFFF", fg="#0055A5").pack(pady=18)
+
+        frame_form = tk.Frame(self.ventana, bg="#FFFFFF")
+        frame_form.pack(padx=40, pady=5, fill="both")
+
+        self.widgets = {}
+        campos = [("NIT:", cliente["nit"]), ("Nombre:", cliente["nombre"]), ("Teléfono:", cliente["telefono"])]
+        for i, (label, val) in enumerate(campos):
+            tk.Label(frame_form, text=label, font=("Arial", 11, "bold"), bg="#FFFFFF").grid(row=i, column=0, sticky="e", pady=10, padx=5)
+            entry = tk.Entry(frame_form, font=("Arial", 11), width=30)
+            entry.grid(row=i, column=1, sticky="ew", pady=10, padx=5)
+            entry.insert(0, val)
+            if label == "NIT:": entry.config(state="readonly")
+            self.widgets[label] = entry
+
+        frame_botones = tk.Frame(self.ventana, bg="#FFFFFF")
+        frame_botones.pack(pady=20)
+        tk.Button(frame_botones, text="Guardar Cambios", font=("Arial", 11, "bold"), bg="#0055A5", fg="white",
+                  relief="flat", cursor="hand2", padx=25, pady=8, command=self.guardar).pack(side="left", padx=10)
+        tk.Button(frame_botones, text="Cancelar", font=("Arial", 11, "bold"), bg="#6C757D", fg="white",
+                  relief="flat", cursor="hand2", padx=25, pady=8, command=self.ventana.destroy).pack(side="left", padx=10)
+
+    def centrar_ventana(self):
+        self.ventana.update_idletasks()
+        ancho, alto = 440, 300
+        x = (self.ventana.winfo_screenwidth() // 2) - (ancho // 2)
+        y = (self.ventana.winfo_screenheight() // 2) - (alto // 2)
+        self.ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+    def guardar(self):
+        vals = {k: v.get().strip() for k, v in self.widgets.items()}
+        if not vals["Nombre:"]:
+            messagebox.showerror("Error", "El nombre es obligatorio.", parent=self.ventana)
+            return
+        if ClientesDB.actualizar(self.cliente_original["id"], self.cliente_original["nit"], vals["Nombre:"], vals["Teléfono:"]):
+            self.sistema.cargar_clientes()
+            messagebox.showinfo("Éxito", "Cliente actualizado correctamente.")
+            self.ventana.destroy()
+        else:
+            messagebox.showerror("Error", "No se pudo actualizar el cliente.")
+
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = Login(root)
     root.mainloop()
-
