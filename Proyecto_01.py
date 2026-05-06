@@ -3313,7 +3313,6 @@ class VentanaDatosCliente:
         self.lbl_info = tk.Label(self.ventana, text="", font=("Arial", 9, "italic"), bg="#FFFFFF", fg="#0055A5")
         self.lbl_info.pack()
 
-        # Ocultar nombre y teléfono si el NIT es C/F al inicio
         self._actualizar_visibilidad_campos()
         self.entry_nit.bind("<KeyRelease>", lambda e: self._actualizar_visibilidad_campos())
 
@@ -3373,7 +3372,7 @@ class VentanaDatosCliente:
             nombre = self.entry_nombre.get().strip() or "CLIENTE FINAL"
             telefono = self.entry_tel.get().strip()
 
-        # Guardar cliente en BD si no es C/F
+
         if nit.upper() != "C/F":
             existente = ClientesDB.obtener_por_nit(nit)
             if not existente:
